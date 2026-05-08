@@ -413,6 +413,13 @@ unittest { // argsRest: everything after -- goes to argsRest
     assert(app.argsRest == ["--port", "8080"]);
 }
 
+unittest { // argsRest: defaults still applied when -- is present
+    auto app = new TypedOptApp();
+    app.parseOnly(["app", "--", "extra"]);
+    assert(app.port == 8080);   // defaultValue must fire even with --
+    assert(app.argsRest == ["extra"]);
+}
+
 unittest { // -- before subcommand stops dispatch
     auto app = new SubStopsAtDashDashApp();
     auto leaf = app.parseOnly(["app", "--", "sub"]);

@@ -42,6 +42,7 @@ private Command _parseOne(Command cmd, ref string[] argv) {
         if (tok == "--") {
             cmd.argsRest = argv[i + 1 .. $].dup;
             argv         = [];
+            _finalize(cmd, argSpecs, argIdx);
             return null;
         }
 

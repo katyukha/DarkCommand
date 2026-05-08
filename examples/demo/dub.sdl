@@ -1,0 +1,6 @@
+name "demo"
+description "darkcommand feature demonstration"
+targetType "executable"
+dependency "darkcommand" path="../../"
+sourcePaths "source"
+importPaths "source"

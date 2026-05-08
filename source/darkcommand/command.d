@@ -119,6 +119,45 @@ class Command {
         throw new DarkCommandExitException(code, msg);
     }
 
+    // ── Protected finish-helpers (called by free-function templates) ──────────
+    //
+    // Free-function templates (addFlag/addOption/addArgument) are instantiated
+    // in external-user modules that are not in the darkcommand package, so they
+    // cannot access package(darkcommand) members directly.  Calling a protected
+    // method on `self` works because `self : Command` and protected members are
+    // accessible from any subclass context.
+
+    protected final EntryBuilder!T _finishFlag(T)(
+        EntrySpec spec, T* ptr, string short_, string long_)
+    {
+        _checkDuplicateNames(short_, long_);
+        _entries ~= spec;
+        return new EntryBuilder!T(spec, ptr);
+    }
+
+    protected final EntryBuilder!T _finishOption(T)(
+        EntrySpec spec, T* ptr, string short_, string long_)
+    {
+        _checkDuplicateNames(short_, long_);
+        _setupValueWriters!T(spec, ptr);
+        _entries ~= spec;
+        return new EntryBuilder!T(spec, ptr);
+    }
+
+    protected final EntryBuilder!T _finishArgument(T)(
+        EntrySpec spec, T* ptr, string displayName)
+    {
+        foreach (e; _entries) {
+            if (e.kind == EntrySpec.Kind.argument && e.isRepeating())
+                throw new DarkCommandException(
+                    "repeating argument '" ~ e.displayName ~
+                    "' must be the last argument; cannot add '" ~ displayName ~ "' after it");
+        }
+        _setupValueWriters!T(spec, ptr);
+        _entries ~= spec;
+        return new EntryBuilder!T(spec, ptr);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     package(darkcommand) void _checkDuplicateNames(string short_, string long_) {
@@ -263,7 +302,6 @@ EntryBuilder!T addFlag(alias field, C : Command, T = typeof(field))(
 
     if (short_.length == 0 && long_.length == 0)
         throw new DarkCommandException("flag must have at least one of short or long name");
-    self._checkDuplicateNames(short_, long_);
 
     auto spec     = new EntrySpec();
     spec.kind      = EntrySpec.Kind.flag;
@@ -282,8 +320,7 @@ EntryBuilder!T addFlag(alias field, C : Command, T = typeof(field))(
         spec.writeDefault = () {};
     }
 
-    self._entries ~= spec;
-    return new EntryBuilder!T(spec, ptr);
+    return self._finishFlag!T(spec, ptr, short_, long_);
 }
 
 EntryBuilder!T addOption(alias field, C : Command, T = typeof(field))(
@@ -294,7 +331,6 @@ EntryBuilder!T addOption(alias field, C : Command, T = typeof(field))(
 
     if (short_.length == 0 && long_.length == 0)
         throw new DarkCommandException("option must have at least one of short or long name");
-    self._checkDuplicateNames(short_, long_);
 
     auto spec     = new EntrySpec();
     spec.kind      = EntrySpec.Kind.option;
@@ -303,10 +339,7 @@ EntryBuilder!T addOption(alias field, C : Command, T = typeof(field))(
     spec.desc      = desc;
 
     T* ptr = &field;
-    self._setupValueWriters!T(spec, ptr);
-
-    self._entries ~= spec;
-    return new EntryBuilder!T(spec, ptr);
+    return self._finishOption!T(spec, ptr, short_, long_);
 }
 
 EntryBuilder!T addArgument(alias field, C : Command, T = typeof(field))(
@@ -315,21 +348,11 @@ EntryBuilder!T addArgument(alias field, C : Command, T = typeof(field))(
     static assert(!is(T == bool), "addArgument: bool fields should use addFlag");
     _checkOwnership!(field, C)();
 
-    foreach (e; self._entries) {
-        if (e.kind == EntrySpec.Kind.argument && e.isRepeating())
-            throw new DarkCommandException(
-                "repeating argument '" ~ e.displayName ~
-                "' must be the last argument; cannot add '" ~ displayName ~ "' after it");
-    }
-
     auto spec        = new EntrySpec();
     spec.kind        = EntrySpec.Kind.argument;
     spec.displayName = displayName;
     spec.desc        = desc;
 
     T* ptr = &field;
-    self._setupValueWriters!T(spec, ptr);
-
-    self._entries ~= spec;
-    return new EntryBuilder!T(spec, ptr);
+    return self._finishArgument!T(spec, ptr, displayName);
 }
