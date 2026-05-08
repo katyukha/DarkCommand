@@ -749,3 +749,185 @@ unittest { // markdown docs: options and subcommand sections present
     assert(content.indexOf("## myprog run") >= 0); // subcommand heading
     assert(content.indexOf("--output") >= 0);
 }
+
+// ── Fixtures for issue-fix tests ─────────────────────────────────────────────
+
+class PipeDescApp : Program {
+    string fmt;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!(fmt)("f", "format", "one | two | three");
+    }
+    override protected void setup() {}
+}
+
+class UnderscoreSubCmd : Command {
+    this() { super("my_command", "Sub"); }
+}
+class UnderscoreApp : Program {
+    this() {
+        super("my_app", "1.0.0");
+        add(new UnderscoreSubCmd());
+    }
+    override protected void setup() {}
+}
+
+// ── Issue 1: stale EntrySpec state on same-instance reparse ──────────────────
+
+unittest { // same-instance reparse: bool flag resets to false
+    auto app = new BoolFlagApp();
+    app.parseOnly(["app", "-q"]);
+    assert(app.quiet == true);
+    app.parseOnly(["app"]);
+    assert(app.quiet == false);
+}
+
+unittest { // same-instance reparse: int flag count resets to zero
+    auto app = new IntFlagApp();
+    app.parseOnly(["app", "-vvv"]);
+    assert(app.verbosity == 3);
+    app.parseOnly(["app", "-v"]);
+    assert(app.verbosity == 1);
+}
+
+unittest { // same-instance reparse: default value re-applied
+    auto app = new DefaultOptApp();
+    app.parseOnly(["app", "--shards", "8"]);
+    assert(app.shards == 8);
+    app.parseOnly(["app"]);
+    assert(app.shards == 4);
+}
+
+unittest { // same-instance reparse: required option re-enforced
+    auto app = new RequiredOptApp();
+    app.parseOnly(["app", "--output", "first.txt"]);
+    assertParseError(app, ["app"], "missing required");
+}
+
+unittest { // same-instance reparse: repeating array resets to empty
+    auto app = new RepeatingOptApp();
+    app.parseOnly(["app", "--tag", "a", "--tag", "b"]);
+    assert(app.tags == ["a", "b"]);
+    app.parseOnly(["app", "--tag", "c"]);
+    assert(app.tags == ["c"]);
+}
+
+// ── Issue 3: markdown pipe escaping ──────────────────────────────────────────
+
+unittest { // markdown docs: pipe in description is escaped as \|
+    import darkcommand.docs.markdown : generateMarkdownDocs;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new PipeDescApp().generateMarkdownDocs(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("one \\| two \\| three") >= 0, content);
+}
+
+// ── Issue 4: markdown anchor preserves underscores ───────────────────────────
+
+unittest { // markdown anchor: underscore in command name preserved
+    import darkcommand.docs.markdown : generateMarkdownDocs;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new UnderscoreApp().generateMarkdownDocs(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("my_app-my_command") >= 0, content);
+}
+
+// ── Issue 5: parseOnly must not propagate DarkCommandExitException ────────────
+
+unittest { // parseOnly: --help returns leaf without throwing
+    import std.stdio : stdout, File;
+    auto tmp   = File.tmpfile();
+    auto saved = stdout;
+    stdout = tmp;
+    scope(exit) stdout = saved;
+    auto app = new BoolFlagApp();
+    Command leaf = app.parseOnly(["app", "--help"]);
+    assert(leaf !is null);
+}
+
+// ── Issue 6: --no-X / negatable conflict detected at construction ─────────────
+
+unittest { // definition-time: negatable --X then option --no-X → error
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException({
+        class BadNeg1 : Program {
+            bool verbose;
+            string noVerbose;
+            this() {
+                super("app", "1.0.0");
+                this.addFlag!(verbose)("v", "verbose", "Verbose").negatable();
+                this.addOption!(noVerbose)("", "no-verbose", "Opt");
+            }
+        }
+        new BadNeg1();
+    }());
+}
+
+unittest { // definition-time: option --no-X then negatable --X → error
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException({
+        class BadNeg2 : Program {
+            bool verbose;
+            string noVerbose;
+            this() {
+                super("app", "1.0.0");
+                this.addOption!(noVerbose)("", "no-verbose", "Opt");
+                this.addFlag!(verbose)("v", "verbose", "Verbose").negatable();
+            }
+        }
+        new BadNeg2();
+    }());
+}
+
+// ── Issue 8: negatable flags appear in bash completion word list ──────────────
+
+unittest { // bash completion: --no-X form listed for negatable flags
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new NegatableApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("--no-verbose") >= 0, content);
+    assert(content.indexOf("--no-color")   >= 0, content);
+}
+
+// ── Issue 11: malformed option names rejected at construction ─────────────────
+
+unittest { // definition-time: multi-char short name rejected
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException({
+        class BadName1 : Program {
+            bool f;
+            this() {
+                super("app", "1.0.0");
+                this.addFlag!(f)("ab", "flag", "Flag");
+            }
+        }
+        new BadName1();
+    }());
+}
+
+unittest { // definition-time: long name with space rejected
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException({
+        class BadName2 : Program {
+            bool f;
+            this() {
+                super("app", "1.0.0");
+                this.addFlag!(f)("f", "flag name", "Flag");
+            }
+        }
+        new BadName2();
+    }());
+}

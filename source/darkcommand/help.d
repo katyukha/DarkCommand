@@ -94,7 +94,7 @@ void printHelp(Command cmd) {
             writeln();
             writeln(g ~ ":");
             foreach (n; grouped[g]) {
-                Command sub = _findSubcommand(cmd, n);
+                Command sub = cmd._findSubcommand(n);
                 writefln("  %-26s  %s", n, sub ? sub.summary : "");
             }
         }
@@ -102,7 +102,7 @@ void printHelp(Command cmd) {
             writeln();
             writeln("Commands:");
             foreach (n; ungrouped) {
-                Command sub = _findSubcommand(cmd, n);
+                Command sub = cmd._findSubcommand(n);
                 writefln("  %-26s  %s", n, sub ? sub.summary : "");
             }
         }
@@ -119,8 +119,3 @@ private void _writeBreadcrumb(Command cmd) {
     }
 }
 
-private Command _findSubcommand(Command cmd, string name) {
-    foreach (sub; cmd._subcommands)
-        if (sub.name == name) return sub;
-    return null;
-}

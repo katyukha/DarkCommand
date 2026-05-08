@@ -56,6 +56,7 @@ class EntrySpec {
     // Write delegates — set at registration time in Command.addFlag/addOption/addArgument.
     void delegate(string) writeValue;  // option / argument: raw string → field
     void delegate()       writeDefault;
+    void delegate()       writeReset;  // resets field to zero/init before each parse
     void delegate()       setTrue;     // bool flag
     void delegate()       setFalse;    // bool flag (negatable form --no-X)
     void delegate()       increment_;  // int flag
@@ -89,10 +90,12 @@ class EntrySpec {
 class EntryBuilder(T) {
     private EntrySpec _spec;
     private T*        _ptr;
+    private Object    _cmd;  // Command (as Object to avoid module-level circular import)
 
-    this(EntrySpec spec, T* ptr) {
+    this(EntrySpec spec, T* ptr, Object cmd = null) {
         _spec = spec;
         _ptr  = ptr;
+        _cmd  = cmd;
     }
 
     // defaultValue is only available for non-Nullable fields.
@@ -149,10 +152,14 @@ class EntryBuilder(T) {
     // Only available for bool flags; calling on EntryBuilder!int is a compile error.
     static if (is(T == bool)) {
         EntryBuilder!T negatable() {
-            import darkcommand.command : DarkCommandException;
+            import darkcommand.command : Command, DarkCommandException;
             if (_spec.longName.length == 0)
                 throw new DarkCommandException(
                     "negatable() requires a long name (--no-<name> needs a base name)");
+            if (_cmd !is null) {
+                auto cmd = cast(Command) _cmd;
+                if (cmd !is null) cmd._checkNegatable(_spec.longName);
+            }
             auto ptr = _ptr;
             _spec.negatable = true;
             _spec.setFalse  = () { *ptr = false; };

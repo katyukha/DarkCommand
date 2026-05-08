@@ -137,6 +137,7 @@ private void _writeOneFn(ref Appender!string buf, Command cmd,
     foreach (e; cmd._entries) {
         if (e.shortName.length) words ~= "-"  ~ e.shortName;
         if (e.longName.length)  words ~= "--" ~ e.longName;
+        if (e.negatable)        words ~= "--no-" ~ e.longName;
     }
     words ~= "--help";
 

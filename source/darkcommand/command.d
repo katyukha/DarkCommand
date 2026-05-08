@@ -132,7 +132,7 @@ class Command {
     {
         _checkDuplicateNames(short_, long_);
         _entries ~= spec;
-        return new EntryBuilder!T(spec, ptr);
+        return new EntryBuilder!T(spec, ptr, this);
     }
 
     protected final EntryBuilder!T _finishOption(T)(
@@ -141,7 +141,7 @@ class Command {
         _checkDuplicateNames(short_, long_);
         _setupValueWriters!T(spec, ptr);
         _entries ~= spec;
-        return new EntryBuilder!T(spec, ptr);
+        return new EntryBuilder!T(spec, ptr, this);
     }
 
     protected final EntryBuilder!T _finishArgument(T)(
@@ -155,18 +155,56 @@ class Command {
         }
         _setupValueWriters!T(spec, ptr);
         _entries ~= spec;
-        return new EntryBuilder!T(spec, ptr);
+        return new EntryBuilder!T(spec, ptr, this);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
     package(darkcommand) void _checkDuplicateNames(string short_, string long_) {
+        import std.ascii : isAlphaNum;
+        if (short_.length) {
+            if (short_.length != 1 || !isAlphaNum(short_[0]))
+                throw new DarkCommandException(
+                    "invalid short name '-" ~ short_ ~
+                    "': must be a single alphanumeric character");
+        }
+        if (long_.length) {
+            if (!isAlphaNum(long_[0]))
+                throw new DarkCommandException(
+                    "invalid long name '--" ~ long_ ~
+                    "': must start with an alphanumeric character");
+            foreach (c; long_[1 .. $]) {
+                if (!isAlphaNum(c) && c != '-' && c != '_')
+                    throw new DarkCommandException(
+                        "invalid long name '--" ~ long_ ~
+                        "': invalid character '" ~ [c] ~ "'");
+            }
+        }
         foreach (e; _entries) {
             if (short_.length && e.shortName == short_)
                 throw new DarkCommandException("duplicate short name: -" ~ short_);
             if (long_.length  && e.longName  == long_)
                 throw new DarkCommandException("duplicate long name: --" ~ long_);
+            // Registering --no-X when --X is already negatable is a conflict.
+            if (long_.length > 3 && long_[0 .. 3] == "no-" &&
+                    e.negatable && e.longName == long_[3 .. $])
+                throw new DarkCommandException(
+                    "--" ~ long_ ~ " conflicts with negatable flag --" ~ long_[3 .. $]);
         }
+    }
+
+    package(darkcommand) void _checkNegatable(string baseName) {
+        foreach (e; _entries)
+            if (e.longName == "no-" ~ baseName)
+                throw new DarkCommandException(
+                    "--" ~ baseName ~ " cannot be negatable: --no-" ~ baseName ~
+                    " is already registered");
+    }
+
+    package(darkcommand) Command _findSubcommand(string name) {
+        foreach (sub; _subcommands)
+            if (sub.name == name) return sub;
+        return null;
     }
 
     package(darkcommand) void _setupValueWriters(T)(EntrySpec spec, T* ptr) {
@@ -183,6 +221,7 @@ class Command {
                                 "' to " ~ U.stringof); }
             };
             spec.writeDefault = () {};
+            spec.writeReset   = () { *ptr = T.init; };
 
         } else static if (isRepeatingField!T) {
             alias E = ElementType!T;
@@ -195,6 +234,7 @@ class Command {
                                 "' to " ~ E.stringof); }
             };
             spec.writeDefault = () {};
+            spec.writeReset   = () { *ptr = null; };
 
         } else {
             spec.fieldKind    = EntrySpec.FieldKind.required;
@@ -206,6 +246,7 @@ class Command {
                                 "' to " ~ T.stringof); }
             };
             spec.writeDefault = () {};
+            spec.writeReset   = () { *ptr = T.init; };
         }
     }
 }
@@ -265,10 +306,14 @@ class Program : Command {
     final Command parseOnly(string[] args) {
         import darkcommand.parser : parseChain;
         string[] argv = args.length > 0 ? args[1 .. $] : [];
-        auto chain = parseChain(this, argv);
-        foreach (cmd; chain) cmd.afterParse();
-        foreach (cmd; chain) cmd.validate_();
-        return chain.length > 0 ? chain[$ - 1] : this;
+        try {
+            auto chain = parseChain(this, argv);
+            foreach (cmd; chain) cmd.afterParse();
+            foreach (cmd; chain) cmd.validate_();
+            return chain.length > 0 ? chain[$ - 1] : this;
+        } catch (DarkCommandExitException) {
+            return this;
+        }
     }
 
     final void generateBashCompletion(File output) {
@@ -314,10 +359,12 @@ EntryBuilder!T addFlag(alias field, C : Command, T = typeof(field))(
         spec.fieldKind    = EntrySpec.FieldKind.boolFlag;
         spec.setTrue      = () { *ptr = true; };
         spec.writeDefault = () {};
+        spec.writeReset   = () { *ptr = false; };
     } else {
         spec.fieldKind    = EntrySpec.FieldKind.intFlag;
         spec.increment_   = () { (*ptr)++; };
         spec.writeDefault = () {};
+        spec.writeReset   = () { *ptr = 0; };
     }
 
     return self._finishFlag!T(spec, ptr, short_, long_);

@@ -26,6 +26,13 @@ Command[] parseChain(Command root, string[] argv) {
 // (i.e. those that belong to the matched subcommand).
 // Returns the dispatched subcommand, or null if the token stream is exhausted.
 private Command _parseOne(Command cmd, ref string[] argv) {
+    // Reset all entry state so the same instance can be parsed multiple times.
+    cmd.argsRest = null;
+    foreach (e; cmd._entries) {
+        e.provided = false;
+        if (e.writeReset !is null) e.writeReset();
+    }
+
     // Split _entries into flags/options and arguments for quick lookup.
     EntrySpec[] argSpecs;
     foreach (e; cmd._entries)
@@ -182,7 +189,7 @@ private Command _parseOne(Command cmd, ref string[] argv) {
 
         // ── positional token ─────────────────────────────────────────────────
         // First check if it's a subcommand name.
-        Command sub = _findSubcommand(cmd, tok);
+        Command sub = cmd._findSubcommand(tok);
         if (sub !is null) {
             argv = argv[i + 1 .. $];
             _finalize(cmd, argSpecs, argIdx);
@@ -211,7 +218,7 @@ private Command _parseOne(Command cmd, ref string[] argv) {
 
     // All args consumed with no subcommand matched — try defaultCommand.
     if (cmd._defaultCommand.length > 0) {
-        Command def = _findSubcommand(cmd, cmd._defaultCommand);
+        Command def = cmd._findSubcommand(cmd._defaultCommand);
         if (def !is null) return def;
     }
     return null;
@@ -253,12 +260,6 @@ private EntrySpec _findShort(Command cmd, string name) {
     return null;
 }
 
-private Command _findSubcommand(Command cmd, string name) {
-    foreach (sub; cmd._subcommands)
-        if (sub.name == name) return sub;
-    return null;
-}
-
 private EntrySpec _findNegatable(Command cmd, string baseName) {
     foreach (e; cmd._entries)
         if (e.negatable && e.longName == baseName) return e;
@@ -290,7 +291,7 @@ private Command _defaultDispatch(Command cmd, ref string[] argv, size_t i,
                                   EntrySpec[] argSpecs, size_t argIdx)
 {
     if (cmd._defaultCommand.length == 0) return null;
-    Command def = _findSubcommand(cmd, cmd._defaultCommand);
+    Command def = cmd._findSubcommand(cmd._defaultCommand);
     if (def is null) return null;
     argv = argv[i .. $];
     _finalize(cmd, argSpecs, argIdx);
