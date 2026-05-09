@@ -1,6 +1,5 @@
 module darkcommand.command;
 
-import darkcommand.exceptions;
 import darkcommand.entry;
 import darkcommand.validators;
 import std.stdio  : File;
@@ -216,43 +215,42 @@ class Command {
     package(darkcommand) void _setupValueWriters(T)(EntrySpec spec, T* ptr) {
         import std.conv : to, ConvException;
 
+        spec.writeDefault = () {};  // overridden by .defaultValue() on the builder
+
         static if (isNullable!T) {
             alias U = NullableTarget!T;
-            spec.fieldKind    = EntrySpec.FieldKind.optional;
-            spec.writeValue   = (string raw) {
+            spec.fieldKind  = EntrySpec.FieldKind.optional;
+            spec.writeValue = (string raw) {
                 try         { *ptr = T(raw.to!U); }
                 catch (ConvException)
                             { throw new DarkCommandException(
                                 spec.cliName ~ ": cannot convert '" ~ raw ~
                                 "' to " ~ U.stringof); }
             };
-            spec.writeDefault = () {};
-            spec.writeReset   = () { *ptr = T.init; };
+            spec.writeReset = () { *ptr = T.init; };
 
         } else static if (isRepeatingField!T) {
             alias E = ElementType!T;
-            spec.fieldKind    = EntrySpec.FieldKind.repeating;
-            spec.writeValue   = (string raw) {
+            spec.fieldKind  = EntrySpec.FieldKind.repeating;
+            spec.writeValue = (string raw) {
                 try         { *ptr ~= raw.to!E; }
                 catch (ConvException)
                             { throw new DarkCommandException(
                                 spec.cliName ~ ": cannot convert '" ~ raw ~
                                 "' to " ~ E.stringof); }
             };
-            spec.writeDefault = () {};
-            spec.writeReset   = () { *ptr = null; };
+            spec.writeReset = () { *ptr = null; };
 
         } else {
-            spec.fieldKind    = EntrySpec.FieldKind.required;
-            spec.writeValue   = (string raw) {
+            spec.fieldKind  = EntrySpec.FieldKind.required;
+            spec.writeValue = (string raw) {
                 try         { *ptr = raw.to!T; }
                 catch (ConvException)
                             { throw new DarkCommandException(
                                 spec.cliName ~ ": cannot convert '" ~ raw ~
                                 "' to " ~ T.stringof); }
             };
-            spec.writeDefault = () {};
-            spec.writeReset   = () { *ptr = T.init; };
+            spec.writeReset = () { *ptr = T.init; };
         }
     }
 }
@@ -303,8 +301,6 @@ class Program : Command {
                 else             stderr.writeln(e.msg);
             }
             return e.code;
-        } catch (DarkCommandException e) {
-            return onError(e);
         } catch (Exception e) {
             return onError(e);
         }

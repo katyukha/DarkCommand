@@ -146,11 +146,6 @@ class EntryBuilder(T) {
         return this;
     }
 
-    EntryBuilder!T helpMsg(string msg) {
-        _spec.desc = msg;
-        return this;
-    }
-
     // Only available for bool flags; calling on EntryBuilder!int is a compile error.
     static if (is(T == bool)) {
         EntryBuilder!T negatable() {
