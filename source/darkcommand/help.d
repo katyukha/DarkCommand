@@ -34,7 +34,7 @@ void printHelp(Command cmd) {
     }
     if (cmd.description.length > 0) {
         writeln();
-        writeln(cmd.description);
+        write(_wrapText(cmd.description));
     }
 
     // Options / Flags — always shown; at minimum -h/--help (and --version for Programs).
@@ -108,6 +108,40 @@ void printHelp(Command cmd) {
             }
         }
     }
+}
+
+// Wraps text at `width` columns, preserving blank lines as paragraph breaks.
+// Words longer than `width` are placed on their own line without splitting.
+private string _wrapText(string text, int width = 78) {
+    import std.array  : appender;
+    import std.string : splitLines, split;
+
+    auto result = appender!string;
+    foreach (para; splitLines(text)) {
+        if (para.length == 0) {
+            result ~= "\n";
+            continue;
+        }
+        int col = 0;
+        foreach (word; para.split(" ")) {
+            if (word.length == 0) continue;
+            int wlen = cast(int) word.length;
+            if (col == 0) {
+                result ~= word;
+                col = wlen;
+            } else if (col + 1 + wlen <= width) {
+                result ~= " ";
+                result ~= word;
+                col += 1 + wlen;
+            } else {
+                result ~= "\n";
+                result ~= word;
+                col = wlen;
+            }
+        }
+        result ~= "\n";
+    }
+    return result.data;
 }
 
 private void _writeBreadcrumb(Command cmd) {

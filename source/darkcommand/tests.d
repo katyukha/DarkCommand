@@ -1206,6 +1206,37 @@ unittest { // bash completion: backslash in enum value is escaped as \\
     assert(content.indexOf(`c\\d`) >= 0, content);   // escaped form present
 }
 
+// ── Word-wrapping in help output ─────────────────────────────────────────────
+
+class WrapDescApp : Program {
+    this() {
+        super("app", "1.0.0");
+        description(
+            "This is a deliberately long paragraph that exceeds eighty columns "
+          ~ "and should be automatically wrapped by the help renderer.\n\n"
+          ~ "Second paragraph is also deliberately longer than eighty characters "
+          ~ "to ensure wrapping is applied uniformly.");
+    }
+    override protected void setup() {}
+}
+
+unittest { // help: description is word-wrapped; no line exceeds 80 chars
+    import std.stdio  : stdout, File;
+    import std.string : splitLines;
+    auto tmp = File.tmpfile();
+    auto saved = stdout;
+    stdout = tmp;
+    scope(exit) stdout = saved;
+    import darkcommand.help : printHelp;
+    printHelp(new WrapDescApp());
+    stdout.flush();
+    tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    foreach (l; splitLines(content))
+        assert(l.length <= 80, "line too long: " ~ l);
+}
+
 // ── Issue 3: markdown docs must include --help (and --version) ────────────────
 
 unittest { // markdown docs: --help always appears in options table
