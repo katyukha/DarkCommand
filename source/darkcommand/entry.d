@@ -76,7 +76,7 @@ class EntrySpec {
 
     // Runs all validators; throws DarkCommandException on first failure.
     void runValidators(string raw) {
-        import darkcommand.command : DarkCommandException;
+        import darkcommand.exceptions : DarkCommandException;
         foreach (v; validators) {
             string err = v.validate(raw);
             if (err !is null)
@@ -154,7 +154,8 @@ class EntryBuilder(T) {
     // Only available for bool flags; calling on EntryBuilder!int is a compile error.
     static if (is(T == bool)) {
         EntryBuilder!T negatable() {
-            import darkcommand.command : Command, DarkCommandException;
+            import darkcommand.command : Command;
+            import darkcommand.exceptions : DarkCommandException;
             if (_spec.longName.length == 0)
                 throw new DarkCommandException(
                     "negatable() requires a long name (--no-<name> needs a base name)");

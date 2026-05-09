@@ -1,27 +1,13 @@
 module darkcommand.command;
 
+import darkcommand.exceptions;
 import darkcommand.entry;
 import darkcommand.validators;
 import std.stdio  : File;
 import std.traits : isDynamicArray;
 import std.range  : ElementType;
 
-// ── Exceptions ────────────────────────────────────────────────────────────────
-
-class DarkCommandException : Exception {
-    this(string msg, string file = __FILE__, size_t line = __LINE__) {
-        super(msg, file, line);
-    }
-}
-
-class DarkCommandExitException : DarkCommandException {
-    int code;
-    this(int code, string msg = null,
-         string file = __FILE__, size_t line = __LINE__) {
-        super(msg !is null ? msg : "", file, line);
-        this.code = code;
-    }
-}
+public import darkcommand.exceptions : DarkCommandException, DarkCommandExitException;
 
 // ── TopicGroup ────────────────────────────────────────────────────────────────
 
