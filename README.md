@@ -7,18 +7,6 @@ Subclass-based CLI argument parsing for D.
 The idea is to implement each command as a separate class — command definition, option spec, parsed values, and implementation all live in one place.
 No callbacks, no string-key lookups, no result objects.
 
-## Installation
-
-Add to your `dub.json`:
-```json
-"dependencies": { "darkcommand": "~>0.1.0" }
-```
-
-Or `dub.sdl`:
-```
-dependency "darkcommand" version="~>0.1.0"
-```
-
 ## Quick start
 
 ```d
