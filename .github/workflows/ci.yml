@@ -1,0 +1,32 @@
+name: Tests
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.compiler }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        compiler:
+          - dmd-latest
+          - ldc-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install D compiler
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ${{ matrix.compiler }}
+
+      - name: Run tests
+        run: dub test
+
+      - name: Build demo
+        working-directory: examples/demo
+        run: dub build
