@@ -247,8 +247,10 @@ private void _finalize(Command cmd, EntrySpec[] argSpecs, size_t argIdx) {
         }
     }
     // Check that T[] Arguments received at least one value.
+    // If hasDefault is true the argument was registered with .defaultValue([]),
+    // making it zero-or-more optional; skip the "at least one" enforcement.
     foreach (aspec; argSpecs) {
-        if (aspec.isRepeating() && !aspec.provided)
+        if (aspec.isRepeating() && !aspec.provided && !aspec.hasDefault)
             throw new DarkCommandException(
                 "missing required argument: " ~ aspec.displayName ~
                 " (expected one or more values)");
