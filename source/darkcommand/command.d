@@ -30,6 +30,7 @@ class TopicGroup {
 class Command {
     private string    _name;
     private string    _summary;
+    private string    _description;
     package(darkcommand) Command     _parent;
     package(darkcommand) Command[]   _subcommands;
     package(darkcommand) EntrySpec[] _entries;
@@ -60,8 +61,11 @@ class Command {
         _summary = summary;
     }
 
-    final string name()    const { return _name; }
-    final string summary() const { return _summary; }
+    final string name()        const { return _name; }
+    final string summary()     const { return _summary; }
+    final string description() const { return _description; }
+
+    Command description(string d) { _description = d; return this; }
 
     // ── Subcommand registration ────────────────────────────────────────────────
 

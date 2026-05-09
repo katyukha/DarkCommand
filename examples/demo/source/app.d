@@ -20,6 +20,9 @@ class DevTool : Program {
     this() {
         super("devtool", "1.0.0");
         summary("A sample app demonstrating darkcommand features.");
+        description("devtool orchestrates builds, tests, and the dev server for a project.\n\n"
+                  ~ "Run a subcommand with --help for details, or use --generate-docs\n"
+                  ~ "to produce a full Markdown reference.");
 
         this.addFlag!(verbosity)    ("v", "verbose",             "Increase verbosity (stackable: -vvv)");
         this.addFlag!(quiet)        ("q", "quiet",               "Suppress non-error output");
@@ -74,6 +77,9 @@ class BuildCmd : Command {
 
     this() {
         super("build", "Build the project");
+        description("Compiles the specified target using the project's build system.\n\n"
+                  ~ "Extra flags for the underlying build tool can be passed after --,\n"
+                  ~ "e.g.: devtool build myproject -- --extra-flag value");
         this.addArgument!(target)  ("target",  "Build target");
         this.addOption!  (jobs)    ("j", "jobs",    "Parallel jobs").defaultValue(4);
         this.addFlag!    (release_)(null, "release", "Release build").negatable();
@@ -109,6 +115,9 @@ class TestCmd : Command {
 
     this() {
         super("test", "Run the test suite");
+        description("Runs the project's test suite, optionally filtered by pattern.\n\n"
+                  ~ "Multiple --pattern flags are accepted; a test is run if it matches\n"
+                  ~ "any of them. --filter further narrows results by substring.");
         this.addOption!(patterns)("p", "pattern", "Test pattern (repeatable)");
         this.addOption!(filter)  ("f", "filter",  "Substring filter on test names");
     }
@@ -133,6 +142,9 @@ class CleanCmd : Command {
 
     this() {
         super("clean", "Remove build artifacts");
+        description("Deletes compiled output from the build directory.\n\n"
+                  ~ "By default only final artifacts are removed. Pass --all to also\n"
+                  ~ "delete intermediate object files and the dependency cache.");
         this.addFlag!(all)(null, "all", "Remove caches and intermediates too");
     }
 
@@ -153,6 +165,9 @@ class ServerCmd : Command {
 
     this() {
         super("server", "Manage the dev server");
+        description("Controls the local development server.\n\n"
+                  ~ "Running `devtool server` without a subcommand is equivalent\n"
+                  ~ "to `devtool server start`.");
         this.addOption!(host)(null, "host", "Bind address").defaultValue("127.0.0.1");
         add(new StartCmd());
         add(new StopCmd());
@@ -167,6 +182,10 @@ class StartCmd : Command {
 
     this() {
         super("start", "Start the dev server");
+        description("Starts the HTTP development server and binds it to the address\n"
+                  ~ "configured on the parent `server` command (default 127.0.0.1).\n\n"
+                  ~ "With --watch the server monitors source files and restarts\n"
+                  ~ "automatically when changes are detected.");
         this.addOption!(port) ("p", "port",  "Port number").defaultValue(8080);
         this.addFlag!  (watch)(null, "watch", "Reload on file changes").negatable();
     }
@@ -193,6 +212,9 @@ class StopCmd : Command {
 
     this() {
         super("stop", "Stop the dev server");
+        description("Sends a shutdown signal to the running dev server.\n\n"
+                  ~ "By default the server is given time to finish in-flight requests.\n"
+                  ~ "Use --force to terminate it immediately.");
         this.addFlag!(force)(null, "force", "Kill without graceful shutdown");
     }
 

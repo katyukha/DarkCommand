@@ -32,6 +32,10 @@ void printHelp(Command cmd) {
         writeln();
         writeln(cmd.summary);
     }
+    if (cmd.description.length > 0) {
+        writeln();
+        writeln(cmd.description);
+    }
 
     // Options / Flags — always shown; at minimum -h/--help (and --version for Programs).
     writeln();

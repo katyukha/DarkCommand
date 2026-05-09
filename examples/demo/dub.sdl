@@ -1,6 +1,7 @@
 name "demo"
 description "darkcommand feature demonstration"
 targetType "executable"
+targetPath "build"
 dependency "darkcommand" path="../../"
 sourcePaths "source"
 importPaths "source"

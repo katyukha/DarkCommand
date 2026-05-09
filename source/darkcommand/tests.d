@@ -1064,6 +1064,99 @@ unittest { // markdown docs: newline in description does not break table row
     assert(content.indexOf("line1 line2") >= 0, content);
 }
 
+// ── Long description ──────────────────────────────────────────────────────────
+
+class LongDescApp : Program {
+    this() {
+        super("app", "1.0.0");
+        summary("Short summary.");
+        description("First paragraph.\n\nSecond paragraph.");
+    }
+    override protected void setup() {}
+}
+
+class LongDescSubCmd : Command {
+    this() {
+        super("sub", "Sub summary.");
+        description("Sub long description.");
+    }
+}
+class LongDescSubApp : Program {
+    this() {
+        super("app", "1.0.0");
+        add(new LongDescSubCmd());
+    }
+    override protected void setup() {}
+}
+
+unittest { // description: defaults to empty string
+    assert(new BoolFlagApp().description == "");
+}
+
+unittest { // description: setter stores value; getter returns it
+    assert(new LongDescApp().description == "First paragraph.\n\nSecond paragraph.");
+}
+
+unittest { // help: description appears after summary, before options
+    import std.stdio : stdout, File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    auto saved = stdout;
+    stdout = tmp;
+    scope(exit) stdout = saved;
+    import darkcommand.help : printHelp;
+    printHelp(new LongDescApp());
+    stdout.flush();
+    tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("First paragraph.") >= 0, content);
+    assert(content.indexOf("Short summary.") < content.indexOf("First paragraph."), content);
+}
+
+unittest { // help: subcommand description shown
+    import std.stdio : stdout, File;
+    import std.string : indexOf;
+    auto app = new LongDescSubApp();
+    auto sub = cast(LongDescSubCmd) app.parseOnly(["app", "sub"]);
+    auto tmp = File.tmpfile();
+    auto saved = stdout;
+    stdout = tmp;
+    scope(exit) stdout = saved;
+    import darkcommand.help : printHelp;
+    printHelp(sub);
+    stdout.flush();
+    tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("Sub long description.") >= 0, content);
+}
+
+unittest { // markdown: description appears after summary
+    import darkcommand.docs.markdown : generateMarkdownDocs;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new LongDescApp().generateMarkdownDocs(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("First paragraph.") >= 0, content);
+    assert(content.indexOf("Short summary.") < content.indexOf("First paragraph."), content);
+}
+
+unittest { // markdown: subcommand description appears in its section
+    import darkcommand.docs.markdown : generateMarkdownDocs;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new LongDescSubApp().generateMarkdownDocs(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("Sub long description.") >= 0, content);
+}
+
 // ── Issue 1: validateEachWith on repeating T[] must be a compile-time error ───
 
 // validateEachWith on a T[] (repeating) field used to silently become a no-op
