@@ -3,7 +3,7 @@ build/
 examples/demo/build/
 docs.json
 __dummy.html
-docs/
+/docs/
 /darkcommand
 darkcommand.so
 darkcommand.dylib
