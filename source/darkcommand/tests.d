@@ -465,7 +465,7 @@ unittest { // validateEachWith
     assertParseError(new DelegateValApp(), ["app", "--count", "0"], "must be positive");
 }
 
-// Stack variable rejection is now a compile-time static assert, not a runtime check.
+// Stack variable rejection and unrelated-class field rejection are compile-time static asserts.
 // Passing a local variable triggers: "stackVar is not a class field (local variable?)"
 // Passing a field from an unrelated class triggers: "x belongs to OtherCmd which is not
 // in MyCmd's class hierarchy"
@@ -695,6 +695,18 @@ unittest { // bash completion: subcommand and options appear in word lists
     assert(content.indexOf("--help") >= 0);
 }
 
+unittest { // bash completion: --version present for Program with auto-version
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new GenDocsApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("--version") >= 0, content);
+}
+
 unittest { // bash completion: enum values and file completion hints
     import darkcommand.completion.bash : generateBashCompletion;
     import std.stdio : File;
@@ -772,7 +784,7 @@ class UnderscoreApp : Program {
     override protected void setup() {}
 }
 
-// ── Issue 1: stale EntrySpec state on same-instance reparse ──────────────────
+// ── Same-instance reparse ─────────────────────────────────────────────────────
 
 unittest { // same-instance reparse: bool flag resets to false
     auto app = new BoolFlagApp();
@@ -812,7 +824,7 @@ unittest { // same-instance reparse: repeating array resets to empty
     assert(app.tags == ["c"]);
 }
 
-// ── Issue 3: markdown pipe escaping ──────────────────────────────────────────
+// ── Markdown pipe escaping ────────────────────────────────────────────────────
 
 unittest { // markdown docs: pipe in description is escaped as \|
     import darkcommand.docs.markdown : generateMarkdownDocs;
@@ -826,7 +838,7 @@ unittest { // markdown docs: pipe in description is escaped as \|
     assert(content.indexOf("one \\| two \\| three") >= 0, content);
 }
 
-// ── Issue 4: markdown anchor preserves underscores ───────────────────────────
+// ── Markdown anchor underscores ───────────────────────────────────────────────
 
 unittest { // markdown anchor: underscore in command name preserved
     import darkcommand.docs.markdown : generateMarkdownDocs;
@@ -840,7 +852,7 @@ unittest { // markdown anchor: underscore in command name preserved
     assert(content.indexOf("my_app-my_command") >= 0, content);
 }
 
-// ── Issue 5: parseOnly must not propagate DarkCommandExitException ────────────
+// ── parseOnly: exit exception handling ───────────────────────────────────────
 
 unittest { // parseOnly: --help returns leaf without throwing
     import std.stdio : stdout, File;
@@ -853,7 +865,7 @@ unittest { // parseOnly: --help returns leaf without throwing
     assert(leaf !is null);
 }
 
-// ── Issue 6: --no-X / negatable conflict detected at construction ─────────────
+// ── Negatable conflict detection ──────────────────────────────────────────────
 
 unittest { // definition-time: negatable --X then option --no-X → error
     import std.exception : assertThrown;
@@ -887,7 +899,7 @@ unittest { // definition-time: option --no-X then negatable --X → error
     }());
 }
 
-// ── Issue 8: negatable flags appear in bash completion word list ──────────────
+// ── Bash completion: negatable flags ──────────────────────────────────────────
 
 unittest { // bash completion: --no-X form listed for negatable flags
     import darkcommand.completion.bash : generateBashCompletion;
@@ -902,7 +914,7 @@ unittest { // bash completion: --no-X form listed for negatable flags
     assert(content.indexOf("--no-color")   >= 0, content);
 }
 
-// ── Issue 11: malformed option names rejected at construction ─────────────────
+// ── Malformed option names ────────────────────────────────────────────────────
 
 unittest { // definition-time: multi-char short name rejected
     import std.exception : assertThrown;
@@ -1157,7 +1169,7 @@ unittest { // markdown: subcommand description appears in its section
     assert(content.indexOf("Sub long description.") >= 0, content);
 }
 
-// ── Issue 1: validateEachWith on repeating T[] must be a compile-time error ───
+// ── validateEachWith on T[] is a compile-time error ───────────────────────────
 
 // validateEachWith on a T[] (repeating) field used to silently become a no-op
 // because DelegateValidator!(T[]) tried raw.to!(T[]) per token, always threw
@@ -1170,7 +1182,7 @@ static assert(!__traits(compiles, {
     b.validateEachWith((string[] v) => v.length > 0, "msg");
 }));
 
-// ── Issue 2: bash completion — shell-special chars in acceptsValues escaped ───
+// ── Bash completion: shell-special chars in acceptsValues escaped ──────────────
 
 class EscapeValApp : Program {
     string fmt;
@@ -1237,7 +1249,7 @@ unittest { // help: description is word-wrapped; no line exceeds 80 chars
         assert(l.length <= 80, "line too long: " ~ l);
 }
 
-// ── Issue 3: markdown docs must include --help (and --version) ────────────────
+// ── Markdown docs: --help and --version entries ───────────────────────────────
 
 unittest { // markdown docs: --help always appears in options table
     import darkcommand.docs.markdown : generateMarkdownDocs;

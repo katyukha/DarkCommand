@@ -148,6 +148,8 @@ private void _writeOneFn(ref Appender!string buf, Command cmd,
         if (e.negatable)        words ~= "--no-" ~ e.longName;
     }
     words ~= "--help";
+    if (auto prog = cast(Program) cmd) if (!prog._noAutoVersion)
+        words ~= "--version";
 
     buf ~= "    COMPREPLY=($(compgen -W \"" ~ words.join(" ") ~ "\" -- \"$cur\"))\n";
     buf ~= "}\n\n";
