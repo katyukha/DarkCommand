@@ -1,6 +1,6 @@
 module darkcommand.entry;
 
-import darkcommand.validators;
+private import darkcommand.validators;
 
 // ── Field-kind helpers ─────────────────────────────────────────────────────────
 

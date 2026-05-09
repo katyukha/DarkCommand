@@ -1,7 +1,7 @@
 module darkcommand.help;
 
-import darkcommand.command;
-import darkcommand.entry;
+private import darkcommand.command;
+private import darkcommand.entry;
 
 // Returns true when color output should be suppressed (NO_COLOR env var set,
 // per https://no-color.org).

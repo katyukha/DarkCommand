@@ -1,8 +1,8 @@
 module darkcommand.parser;
 
-import darkcommand.command;
-import darkcommand.entry;
-import darkcommand.utils;
+private import darkcommand.command;
+private import darkcommand.entry;
+private import darkcommand.utils;
 
 // Parses the full command chain starting at root, returns the matched subcommand
 // chain (root-level entries are consumed but root itself is not in the returned slice).

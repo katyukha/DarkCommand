@@ -1,10 +1,10 @@
 module darkcommand.command;
 
-import darkcommand.entry;
-import darkcommand.validators;
-import std.stdio  : File;
-import std.traits : isDynamicArray;
-import std.range  : ElementType;
+private import darkcommand.entry;
+private import darkcommand.validators;
+private import std.stdio  : File;
+private import std.traits : isDynamicArray;
+private import std.range  : ElementType;
 
 public import darkcommand.exceptions : DarkCommandException, DarkCommandExitException;
 

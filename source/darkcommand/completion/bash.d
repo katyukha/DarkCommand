@@ -1,9 +1,9 @@
 module darkcommand.completion.bash;
 
-import darkcommand.command;
-import darkcommand.entry;
-import std.stdio : File;
-import std.array : appender, Appender, join;
+private import darkcommand.command;
+private import darkcommand.entry;
+private import std.stdio : File;
+private import std.array : appender, Appender, join;
 
 // Writes a bash completion script for `prog` to `output`.
 // Source the script; it registers completion for the program name.
