@@ -4,8 +4,7 @@ import darkcommand.command;
 import darkcommand.entry;
 
 // Returns true when color output should be suppressed (NO_COLOR env var set,
-// per https://no-color.org).  Colors are not yet used in Phase 1; this flag is
-// the hook for Phase 2+ formatting enhancements.
+// per https://no-color.org).
 bool noColor() {
     import std.process : environment;
     return environment.get("NO_COLOR", "").length > 0;

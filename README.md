@@ -133,7 +133,7 @@ class DeployCmd : Command {
         resolvedConfig = lookupConfig(target);
     }
 
-    override protected void validate_() {
+    override protected void validate() {
         if (target == "prod" && !confirmProd())
             throw new DarkCommandException("prod deploy requires confirmation");
     }
@@ -145,7 +145,7 @@ class DeployCmd : Command {
 }
 ```
 
-Lifecycle order: parse → `setup()` (Program only) → `afterParse()` → `validate_()` → `execute()` (leaf).
+Lifecycle order: parse → `setup()` (Program only) → `afterParse()` → `validate()` → `execute()` (leaf).
 
 ## Topic groups, default command, argsRest
 

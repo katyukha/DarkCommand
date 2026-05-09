@@ -631,7 +631,7 @@ unittest { // help output shows --[no-]name for negatable flags
     assert(content.indexOf("--[no-]color")   >= 0, content);
 }
 
-// ── Phase 3: defaultCommand ───────────────────────────────────────────────────
+// ── defaultCommand ────────────────────────────────────────────────────────────
 
 unittest { // defaultCommand: no subcommand typed → dispatches to default
     auto app = new DefaultCmdApp();
@@ -657,7 +657,7 @@ unittest { // defaultCommand: default subcommand gets its own defaultValue
     assert(leaf.port == 8080);
 }
 
-// ── Phase 2: bash completion ──────────────────────────────────────────────────
+// ── Bash completion ───────────────────────────────────────────────────────────
 
 unittest { // bash completion: entry point and complete directive present
     import darkcommand.completion.bash : generateBashCompletion;
@@ -712,7 +712,7 @@ unittest { // bash completion: enum values and file completion hints
     assert(content.indexOf("compgen -f") >= 0); // file completion for --output
 }
 
-// ── Phase 2: markdown docs ────────────────────────────────────────────────────
+// ── Markdown docs ─────────────────────────────────────────────────────────────
 
 unittest { // markdown docs: top-level heading and summary
     import darkcommand.docs.markdown : generateMarkdownDocs;
