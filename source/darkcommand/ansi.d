@@ -9,8 +9,9 @@ bool noColor() {
 
 package(darkcommand) bool _colorEnabled() {
     version (Posix) {
-        import core.sys.posix.unistd : isatty, STDOUT_FILENO;
-        return !noColor() && isatty(STDOUT_FILENO) != 0;
+        import std.stdio : stdout;
+        import core.sys.posix.unistd : isatty;
+        return !noColor() && isatty(stdout.fileno()) != 0;
     } else {
         return false;
     }
@@ -18,8 +19,9 @@ package(darkcommand) bool _colorEnabled() {
 
 package(darkcommand) bool _stderrColorEnabled() {
     version (Posix) {
-        import core.sys.posix.unistd : isatty, STDERR_FILENO;
-        return !noColor() && isatty(STDERR_FILENO) != 0;
+        import std.stdio : stderr;
+        import core.sys.posix.unistd : isatty;
+        return !noColor() && isatty(stderr.fileno()) != 0;
     } else {
         return false;
     }

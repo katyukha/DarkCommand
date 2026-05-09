@@ -1,4 +1,6 @@
-# darkcommand
+# Dark Command
+
+[![Tests](https://github.com/katyukha/darkcommand/actions/workflows/ci.yml/badge.svg)](https://github.com/katyukha/darkcommand/actions/workflows/ci.yml)
 
 > **Alpha:** This library is in early development. The API may change between releases.
 
