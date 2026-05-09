@@ -115,9 +115,13 @@ class EntryBuilder(T) {
         return this;
     }
 
-    // Not available for T[] (repeating) fields: calling it on string[] would
-    // silently no-op because DelegateValidator tries raw.to!(T[]) per token.
-    static if (!isRepeatingField!T) {
+    static if (isRepeatingField!T) {
+        import std.range : ElementType;
+        EntryBuilder!T validateEachWith(bool delegate(ElementType!T) pred, string msg) {
+            _spec.validators ~= new DelegateValidator!(ElementType!T)(pred, msg);
+            return this;
+        }
+    } else {
         EntryBuilder!T validateEachWith(bool delegate(T) pred, string msg) {
             _spec.validators ~= new DelegateValidator!T(pred, msg);
             return this;

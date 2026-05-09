@@ -1169,18 +1169,46 @@ unittest { // markdown: subcommand description appears in its section
     assert(content.indexOf("Sub long description.") >= 0, content);
 }
 
-// ── validateEachWith on T[] is a compile-time error ───────────────────────────
+// ── validateEachWith on T[]: validates per element ────────────────────────────
 
-// validateEachWith on a T[] (repeating) field used to silently become a no-op
-// because DelegateValidator!(T[]) tried raw.to!(T[]) per token, always threw
-// ConvException, and was swallowed.  A static assert now prevents misuse.
+// For T[] fields, validateEachWith takes bool delegate(ElementType!T), not
+// bool delegate(T[]).  Passing the array type is still a compile-time error.
 static assert(!__traits(compiles, {
     import darkcommand.entry : EntrySpec, EntryBuilder;
     auto spec = new EntrySpec();
     string[] arr;
     auto b = new EntryBuilder!(string[])(spec, &arr);
-    b.validateEachWith((string[] v) => v.length > 0, "msg");
+    b.validateEachWith((string[] v) => v.length > 0, "msg"); // wrong: takes array, not element
 }));
+
+// Passing the element type must compile.
+static assert(__traits(compiles, {
+    import darkcommand.entry : EntrySpec, EntryBuilder;
+    auto spec = new EntrySpec();
+    string[] arr;
+    auto b = new EntryBuilder!(string[])(spec, &arr);
+    b.validateEachWith((string v) => v.length > 0, "msg"); // correct: element type
+}));
+
+class ValidateEachApp : Program {
+    string[] tags;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!(tags)(null, "tag", "Tag")
+            .validateEachWith(v => v.length > 0, "tag must not be empty");
+    }
+    override protected void setup() {}
+}
+
+unittest { // validateEachWith on T[]: valid elements pass
+    auto app = new ValidateEachApp();
+    app.parseOnly(["app", "--tag", "a", "--tag", "b"]);
+    assert(app.tags == ["a", "b"]);
+}
+
+unittest { // validateEachWith on T[]: failing element produces error
+    assertParseError(new ValidateEachApp(), ["app", "--tag", ""], "tag must not be empty");
+}
 
 // ── Bash completion: shell-special chars in acceptsValues escaped ──────────────
 
