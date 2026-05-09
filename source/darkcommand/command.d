@@ -331,7 +331,8 @@ class Program : Command {
 
     protected int onError(Exception e) {
         import std.stdio : stderr;
-        stderr.writeln("Error: ", e.msg);
+        import darkcommand.ansi : _red, _stderrColorEnabled;
+        stderr.writeln(_red("Error: ", _stderrColorEnabled()), e.msg);
         return 1;
     }
 

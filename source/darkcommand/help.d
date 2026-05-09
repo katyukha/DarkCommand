@@ -2,43 +2,47 @@ module darkcommand.help;
 
 private import darkcommand.command;
 private import darkcommand.entry;
-
-// Returns true when color output should be suppressed (NO_COLOR env var set,
-// per https://no-color.org).
-bool noColor() {
-    import std.process : environment;
-    return environment.get("NO_COLOR", "").length > 0;
-}
+private import darkcommand.ansi;
 
 void printHelp(Command cmd) {
-    import std.stdio : write, writeln, writefln;
+    _printHelp(cmd, _colorEnabled());
+}
 
-    // Usage line — [options] always present because --help is always available.
+package(darkcommand) void printHelpColored(Command cmd) {
+    _printHelp(cmd, true);
+}
+
+private void _printHelp(Command cmd, bool color) {
+    import std.stdio : write, writeln, writefln;
+    import std.array : replicate, join;
+
+    // Usage line
     bool hasArguments = false;
     foreach (e; cmd._entries)
         if (e.kind == EntrySpec.Kind.argument) hasArguments = true;
 
-    write("Usage: ");
-    _writeBreadcrumb(cmd);
-    write(" [options]");
-    foreach (e; cmd._entries)
-        if (e.kind == EntrySpec.Kind.argument)
-            write(" <" ~ e.displayName ~ ">");
-    if (cmd._subcommands.length > 0) write(" <command>");
-    writeln();
-
-    if (cmd.summary.length > 0) {
-        writeln();
+    if (cmd.summary.length > 0)
         writeln(cmd.summary);
-    }
+
     if (cmd.description.length > 0) {
         writeln();
-        write(_wrapText(cmd.description));
+        write(_dim(_wrapText(cmd.description), color));
     }
 
-    // Options / Flags — always shown; at minimum -h/--help (and --version for Programs).
     writeln();
-    writeln("Options:");
+    writeln(_bold("Usage", color));
+    write("  " ~ _dim("$", color) ~ " ");
+    _writeBreadcrumb(cmd);
+    write(" " ~ _dim("[options]", color));
+    foreach (e; cmd._entries)
+        if (e.kind == EntrySpec.Kind.argument)
+            write(" " ~ _dim("<" ~ e.displayName ~ ">", color));
+    if (cmd._subcommands.length > 0) write(" " ~ _dim("<command>", color));
+    writeln();
+
+    // Options — always shown; at minimum -h/--help (and --version for Programs).
+    writeln();
+    writeln(_bold("Options", color));
     foreach (e; cmd._entries) {
         if (e.kind == EntrySpec.Kind.argument) continue;
         string longPart = e.negatable
@@ -51,30 +55,39 @@ void printHelp(Command cmd) {
             names = "  -" ~ e.shortName;
         else
             names = "      " ~ longPart;
-        writefln("%-28s  %s", names, e.desc);
+        string valueTag = e.isFlag() ? "" :
+            " <" ~ (e.longName.length ? e.longName : "value") ~ ">";
+        size_t visualWidth = names.length + valueTag.length;
+        size_t pad = visualWidth < 28 ? 28 - visualWidth : 0;
+        writeln(names, _underline(valueTag, color), replicate(" ", pad), "  ", _dim(e.desc, color));
     }
-    writefln("%-28s  %s", "  -h, --help", "Show this help");
+    {
+        enum hnames = "  -h, --help";
+        writeln(hnames, replicate(" ", 28 - hnames.length), "  ", _dim("Show this help", color));
+    }
     if (auto prog = cast(Program) cmd) {
-        if (!prog._noAutoVersion)
-            writefln("%-28s  %s", "      --version", "Show version");
+        if (!prog._noAutoVersion) {
+            enum vnames = "      --version";
+            writeln(vnames, replicate(" ", 28 - vnames.length), "  ", _dim("Show version", color));
+        }
     }
 
     // Arguments
     if (hasArguments) {
         writeln();
-        writeln("Arguments:");
+        writeln(_bold("Arguments", color));
         foreach (e; cmd._entries) {
             if (e.kind != EntrySpec.Kind.argument) continue;
-            writefln("  %-26s  %s", e.displayName, e.desc);
+            size_t pad = e.displayName.length < 26 ? 26 - e.displayName.length : 0;
+            writeln("  ", e.displayName, replicate(" ", pad), "  ", _dim(e.desc, color));
         }
     }
 
     // Subcommands grouped
     if (cmd._subcommands.length > 0) {
-        // Collect groups
         string[] groupOrder;
         string[][string] grouped;
-        bool[]  usedGrouped;
+        bool[] usedGrouped;
         usedGrouped.length = cmd._subcommands.length;
 
         foreach (i, sub; cmd._subcommands) {
@@ -85,40 +98,38 @@ void printHelp(Command cmd) {
             usedGrouped[i] = true;
         }
 
-        // Ungrouped
         string[] ungrouped;
         foreach (i, sub; cmd._subcommands)
             if (!usedGrouped[i]) ungrouped ~= sub.name;
 
+        writeln();
+        writeln(_bold("Commands", color));
         foreach (g; groupOrder) {
             writeln();
-            writeln(g ~ ":");
+            writeln("  ", _underline(g ~ ":", color));
             foreach (n; grouped[g]) {
                 Command sub = cmd._findSubcommand(n);
-                writefln("  %-26s  %s", n, sub ? sub.summary : "");
+                writefln("    %-24s  %s", n, _dim(sub ? sub.summary : "", color));
             }
         }
         if (ungrouped.length > 0) {
-            writeln();
-            writeln("Commands:");
+            if (groupOrder.length > 0) writeln();
             foreach (n; ungrouped) {
                 Command sub = cmd._findSubcommand(n);
-                writefln("  %-26s  %s", n, sub ? sub.summary : "");
+                writefln("  %-26s  %s", n, _dim(sub ? sub.summary : "", color));
             }
         }
     }
 
     if (auto prog = cast(Program) cmd) {
         if (prog._shortcuts.length > 0) {
-            import std.array : join;
             writeln();
-            writeln("Shortcuts:");
+            writeln(_bold("Shortcuts", color));
             foreach (s; prog._shortcuts) {
-                string expansion = s.expansion.join(" ");
-                string desc = s.summary.length
-                    ? expansion ~ " — " ~ s.summary
-                    : expansion;
-                writefln("  %-26s  %s", s.name, desc);
+                string right = s.expansion.join(" ");
+                if (s.summary.length)
+                    right ~= " — " ~ _dim(s.summary, color);
+                writefln("  %-26s  %s", s.name, right);
             }
         }
     }
@@ -167,4 +178,3 @@ private void _writeBreadcrumb(Command cmd) {
         write(cmd.name);
     }
 }
-

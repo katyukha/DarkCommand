@@ -1277,6 +1277,39 @@ unittest { // help: description is word-wrapped; no line exceeds 80 chars
         assert(l.length <= 80, "line too long: " ~ l);
 }
 
+// ── Color output ─────────────────────────────────────────────────────────────
+
+unittest { // color: forced-color output contains ANSI bold and underline codes
+    import std.stdio : stdout, File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    auto saved = stdout; stdout = tmp;
+    scope(exit) stdout = saved;
+    import darkcommand.help : printHelpColored;
+    printHelpColored(new RequiredOptApp());
+    stdout.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("\x1b[1m") >= 0, "expected ANSI bold codes on section headers");
+    assert(content.indexOf("\x1b[2m") >= 0, "expected ANSI dim codes on descriptions");
+    assert(content.indexOf("\x1b[4m") >= 0, "expected ANSI underline codes on value tags");
+    assert(content.indexOf("<output>") >= 0, "expected value tag for --output");
+}
+
+unittest { // color: non-TTY output contains no ANSI codes
+    import std.stdio : stdout, File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    auto saved = stdout; stdout = tmp;
+    scope(exit) stdout = saved;
+    import darkcommand.help : printHelp;
+    printHelp(new BoolFlagApp());
+    stdout.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("\x1b[") < 0, "unexpected ANSI codes in non-TTY output");
+}
+
 // ── Shortcuts ─────────────────────────────────────────────────────────────────
 
 class ShortcutLeafCmd : Command {
@@ -1385,7 +1418,7 @@ unittest { // help: Shortcuts section with name, expansion, and summary
     stdout.flush(); tmp.seek(0);
     string content; char[] line;
     while (tmp.readln(line)) content ~= line;
-    assert(content.indexOf("Shortcuts:") >= 0, content);
+    assert(content.indexOf("Shortcuts") >= 0, content);
     assert(content.indexOf("lsd")        >= 0, content);
     assert(content.indexOf("db list")    >= 0, content);
 }
