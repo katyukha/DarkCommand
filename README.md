@@ -1,8 +1,11 @@
 # darkcommand
 
-A D library for CLI argument parsing designed for programs with large command sets and deep subcommand trees.
+> **Alpha:** This library is in early development. The API may change between releases.
 
-**Design axis:** OOP dispatch only. A command is a class you subclass; parsed values are plain typed fields on that class. No callbacks, no result objects, no string-key lookups.
+Subclass-based CLI argument parsing for D.
+
+The idea is to implement each command as a separate class — command definition, option spec, parsed values, and implementation all live in one place.
+No callbacks, no string-key lookups, no result objects.
 
 ## Installation
 
