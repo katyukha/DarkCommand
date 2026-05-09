@@ -169,7 +169,7 @@ class HooksCmd : Command {
         this.addOption!(target)("t", "target", "Target");
     }
     override protected void afterParse() { afterParseCalled = true; }
-    override protected void validate_() {
+    override protected void validate() {
         validateCalled = true;
         if (method == "bad" && target == "prod")
             throw new DarkCommandException("bad+prod not allowed");

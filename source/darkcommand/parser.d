@@ -119,7 +119,7 @@ private Command _parseOne(Command cmd, ref string[] argv) {
             } else if (spec.isIntFlag()) {
                 if (hasEq) throw new DarkCommandException(
                     "--" ~ name ~ " is a flag and does not take a value");
-                spec.increment_();
+                spec.increment();
                 spec.provided = true;
             } else {
                 // value-taking option
@@ -171,7 +171,7 @@ private Command _parseOne(Command cmd, ref string[] argv) {
                     spec.provided = true;
 
                 } else if (spec.isIntFlag()) {
-                    spec.increment_();
+                    spec.increment();
                     spec.provided = true;
 
                 } else {

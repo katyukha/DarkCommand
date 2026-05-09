@@ -99,7 +99,7 @@ class Command {
     // ── Hooks (override in subclasses) ─────────────────────────────────────────
 
     protected void afterParse() {}
-    protected void validate_()  {}   // named validate_ to avoid D keyword conflict
+    protected void validate()   {}
 
     int execute() {
         if (_subcommands.length > 0) {
@@ -294,7 +294,7 @@ class Program : Command {
                 cmd.afterParse();
 
             foreach (cmd; chain)
-                cmd.validate_();
+                cmd.validate();
 
             Command leaf = chain.length > 0 ? chain[$ - 1] : this;
             return leaf.execute();
@@ -316,7 +316,7 @@ class Program : Command {
         try {
             auto chain = parseChain(this, argv);
             foreach (cmd; chain) cmd.afterParse();
-            foreach (cmd; chain) cmd.validate_();
+            foreach (cmd; chain) cmd.validate();
             return chain.length > 0 ? chain[$ - 1] : this;
         } catch (DarkCommandExitException) {
             return this;
@@ -369,7 +369,7 @@ EntryBuilder!T addFlag(alias field, C : Command, T = typeof(field))(
         spec.writeReset   = () { *ptr = false; };
     } else {
         spec.fieldKind    = EntrySpec.FieldKind.intFlag;
-        spec.increment_   = () { (*ptr)++; };
+        spec.increment    = () { (*ptr)++; };
         spec.writeDefault = () {};
         spec.writeReset   = () { *ptr = 0; };
     }

@@ -73,7 +73,7 @@ class DevTool : Program {
 class BuildCmd : Command {
     string target;
     int    jobs;
-    bool   release_;
+    bool   release;
 
     this() {
         super("build", "Build the project");
@@ -82,7 +82,7 @@ class BuildCmd : Command {
                   ~ "e.g.: devtool build myproject -- --extra-flag value");
         this.addArgument!(target)  ("target",  "Build target");
         this.addOption!  (jobs)    ("j", "jobs",    "Parallel jobs").defaultValue(4);
-        this.addFlag!    (release_)(null, "release", "Release build").negatable();
+        this.addFlag!    (release)(null, "release", "Release build").negatable();
     }
 
     override int execute() {
@@ -90,10 +90,10 @@ class BuildCmd : Command {
 
         if (prog.verbosity > 0)
             writefln("[verbose=%d] target=%s jobs=%d release=%s",
-                     prog.verbosity, target, jobs, release_);
+                     prog.verbosity, target, jobs, release);
 
         writefln("Building '%s' with %d job(s)%s",
-            target, jobs, release_ ? " [release]" : "");
+            target, jobs, release ? " [release]" : "");
 
         // argsRest holds everything after -- on the command line:
         //   devtool build myproject -- --extra-flag value
@@ -158,7 +158,7 @@ class CleanCmd : Command {
 //
 // Demonstrates:
 //   nested subcommands, defaultCommand, parent!T() up one level,
-//   afterParse(), validate_(), negatable flag on a leaf command
+//   afterParse(), validate(), negatable flag on a leaf command
 
 class ServerCmd : Command {
     string host;
@@ -195,7 +195,7 @@ class StartCmd : Command {
         resolvedAddr = format("%s:%d", parent!ServerCmd.host, port);
     }
 
-    override protected void validate_() {
+    override protected void validate() {
         if (port < 1 || port > 65535)
             throw new DarkCommandException("--port must be between 1 and 65535");
     }

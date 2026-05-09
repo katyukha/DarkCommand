@@ -59,7 +59,7 @@ class EntrySpec {
     void delegate()       writeReset;  // resets field to zero/init before each parse
     void delegate()       setTrue;     // bool flag
     void delegate()       setFalse;    // bool flag (negatable form --no-X)
-    void delegate()       increment_;  // int flag
+    void delegate()       increment;   // int flag
 
     string cliName() const {
         if (longName.length)  return "--" ~ longName;
