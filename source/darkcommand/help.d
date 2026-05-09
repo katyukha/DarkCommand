@@ -107,6 +107,21 @@ void printHelp(Command cmd) {
             }
         }
     }
+
+    if (auto prog = cast(Program) cmd) {
+        if (prog._shortcuts.length > 0) {
+            import std.array : join;
+            writeln();
+            writeln("Shortcuts:");
+            foreach (s; prog._shortcuts) {
+                string expansion = s.expansion.join(" ");
+                string desc = s.summary.length
+                    ? expansion ~ " — " ~ s.summary
+                    : expansion;
+                writefln("  %-26s  %s", s.name, desc);
+            }
+        }
+    }
 }
 
 // Wraps text at `width` columns, preserving blank lines as paragraph breaks.

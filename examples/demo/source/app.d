@@ -37,6 +37,9 @@ class DevTool : Program {
 
         topicGroup("Server")
             .add(new ServerCmd());
+
+        addShortcut("up",   ["server", "start"], "Start the dev server");
+        addShortcut("down", ["server", "stop"],  "Stop the dev server");
     }
 
     override protected void setup() {

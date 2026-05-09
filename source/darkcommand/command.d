@@ -259,19 +259,73 @@ class Command {
     }
 }
 
+// ── ShortcutEntry ─────────────────────────────────────────────────────────────
+
+package(darkcommand) struct ShortcutEntry {
+    string   name;
+    string[] expansion;
+    string   summary;
+}
+
 // ── Program ───────────────────────────────────────────────────────────────────
 
 class Program : Command {
-    package(darkcommand) string _version;
-    package(darkcommand) bool   _noAutoVersion;
+    package(darkcommand) string         _version;
+    package(darkcommand) bool           _noAutoVersion;
+    package(darkcommand) ShortcutEntry[] _shortcuts;
 
     this(string name, string version_) {
         super(name, "");
         _version = version_;
     }
 
-    Program summary(string s)     { _summary = s; return this; }
-    Program noAutoVersion()       { _noAutoVersion = true; return this; }
+    Program summary(string s)  { _summary = s; return this; }
+    Program noAutoVersion()    { _noAutoVersion = true; return this; }
+
+    // Register a shortcut name that expands to the given subcommand path before
+    // parsing. Must be called after all subcommands in the expansion are added.
+    Program addShortcut(string name, string[] expansion, string summary = "") {
+        import std.ascii : isAlphaNum;
+        import std.array : join;
+
+        if (expansion.length == 0)
+            throw new DarkCommandException(
+                "shortcut '" ~ name ~ "': expansion must not be empty");
+        if (name.length == 0)
+            throw new DarkCommandException("shortcut name must not be empty");
+        if (!isAlphaNum(name[0]))
+            throw new DarkCommandException(
+                "invalid shortcut name '" ~ name ~
+                "': must start with an alphanumeric character");
+        foreach (c; name[1 .. $])
+            if (!isAlphaNum(c) && c != '-' && c != '_')
+                throw new DarkCommandException(
+                    "invalid shortcut name '" ~ name ~
+                    "': invalid character '" ~ [c] ~ "'");
+        if (_findSubcommand(name) !is null)
+            throw new DarkCommandException(
+                "shortcut '" ~ name ~ "' conflicts with subcommand '" ~ name ~ "'");
+        foreach (s; _shortcuts)
+            if (s.name == name)
+                throw new DarkCommandException("duplicate shortcut: '" ~ name ~ "'");
+
+        // Validate the expansion path exists in the registered command tree.
+        Command cur = this;
+        foreach (i, token; expansion) {
+            Command next = cur._findSubcommand(token);
+            if (next is null) {
+                string loc = i > 0
+                    ? " under '" ~ expansion[0 .. i].join(" ") ~ "'"
+                    : "";
+                throw new DarkCommandException(
+                    "shortcut '" ~ name ~ "': unknown subcommand '" ~ token ~ "'" ~ loc);
+            }
+            cur = next;
+        }
+
+        _shortcuts ~= ShortcutEntry(name, expansion, summary);
+        return this;
+    }
 
     protected void setup() {}
 
@@ -286,6 +340,7 @@ class Program : Command {
         import std.stdio : stdout, stderr;
         try {
             string[] argv = args.length > 0 ? args[1 .. $] : [];
+            argv = _expandShortcut(argv);
             auto chain = parseChain(this, argv);
 
             setup();
@@ -313,6 +368,7 @@ class Program : Command {
     final Command parseOnly(string[] args) {
         import darkcommand.parser : parseChain;
         string[] argv = args.length > 0 ? args[1 .. $] : [];
+        argv = _expandShortcut(argv);
         try {
             auto chain = parseChain(this, argv);
             foreach (cmd; chain) cmd.afterParse();
@@ -331,6 +387,14 @@ class Program : Command {
     final void generateMarkdownDocs(File output) {
         import darkcommand.docs.markdown : _gen = generateMarkdownDocs;
         _gen(this, output);
+    }
+
+    private string[] _expandShortcut(string[] argv) {
+        if (argv.length > 0)
+            foreach (s; _shortcuts)
+                if (s.name == argv[0])
+                    return s.expansion ~ argv[1 .. $];
+        return argv;
     }
 }
 

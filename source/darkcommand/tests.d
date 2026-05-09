@@ -1277,6 +1277,144 @@ unittest { // help: description is word-wrapped; no line exceeds 80 chars
         assert(l.length <= 80, "line too long: " ~ l);
 }
 
+// ── Shortcuts ─────────────────────────────────────────────────────────────────
+
+class ShortcutLeafCmd : Command {
+    string filter;
+    this() {
+        super("list", "List items");
+        this.addOption!(filter)("f", "filter", "Filter").defaultValue("");
+    }
+    override int execute() { return 0; }
+}
+class ShortcutMidCmd : Command {
+    this() {
+        super("db", "Database management");
+        add(new ShortcutLeafCmd());
+    }
+}
+class ShortcutApp : Program {
+    this() {
+        super("app", "1.0.0");
+        add(new ShortcutMidCmd());
+        addShortcut("lsd", ["db", "list"], "List databases");
+    }
+    override protected void setup() {}
+}
+
+unittest { // shortcut: expands to full parse chain
+    auto leaf = .parseOnly!ShortcutLeafCmd(new ShortcutApp(), ["app", "lsd"]);
+    assert(leaf !is null);
+}
+
+unittest { // shortcut: args after shortcut propagate to expanded command
+    auto leaf = .parseOnly!ShortcutLeafCmd(
+        new ShortcutApp(), ["app", "lsd", "--filter", "foo"]);
+    assert(leaf.filter == "foo");
+}
+
+unittest { // shortcut: parent!T() resolves correctly through full chain
+    auto leaf = .parseOnly!ShortcutLeafCmd(new ShortcutApp(), ["app", "lsd"]);
+    assert(leaf.parent!ShortcutMidCmd !is null);
+}
+
+unittest { // shortcut: definition-time error when first expansion token is unknown
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException({
+        class Bad1 : Program {
+            this() {
+                super("app", "1.0.0");
+                addShortcut("x", ["nonexistent"]);
+            }
+        }
+        new Bad1();
+    }());
+}
+
+unittest { // shortcut: definition-time error when nested expansion token is unknown
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException({
+        class Bad2 : Program {
+            this() {
+                super("app", "1.0.0");
+                add(new ShortcutMidCmd());
+                addShortcut("x", ["db", "nonexistent"]);
+            }
+        }
+        new Bad2();
+    }());
+}
+
+unittest { // shortcut: name conflicts with existing subcommand
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException({
+        class Bad3 : Program {
+            this() {
+                super("app", "1.0.0");
+                add(new ShortcutMidCmd());
+                addShortcut("db", ["db", "list"]);
+            }
+        }
+        new Bad3();
+    }());
+}
+
+unittest { // shortcut: duplicate shortcut name
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException({
+        class Bad4 : Program {
+            this() {
+                super("app", "1.0.0");
+                add(new ShortcutMidCmd());
+                addShortcut("lsd", ["db", "list"]);
+                addShortcut("lsd", ["db", "list"]);
+            }
+        }
+        new Bad4();
+    }());
+}
+
+unittest { // help: Shortcuts section with name, expansion, and summary
+    import std.stdio : stdout, File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    auto saved = stdout; stdout = tmp;
+    scope(exit) stdout = saved;
+    import darkcommand.help : printHelp;
+    printHelp(new ShortcutApp());
+    stdout.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("Shortcuts:") >= 0, content);
+    assert(content.indexOf("lsd")        >= 0, content);
+    assert(content.indexOf("db list")    >= 0, content);
+}
+
+unittest { // bash completion: shortcut names appear in word list
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new ShortcutApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("lsd") >= 0, content);
+}
+
+unittest { // markdown: shortcuts table appears with name and expansion
+    import darkcommand.docs.markdown : generateMarkdownDocs;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new ShortcutApp().generateMarkdownDocs(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("lsd")     >= 0, content);
+    assert(content.indexOf("db list") >= 0, content);
+}
+
 // ── Markdown docs: --help and --version entries ───────────────────────────────
 
 unittest { // markdown docs: --help always appears in options table
