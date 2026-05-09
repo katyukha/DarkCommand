@@ -14,14 +14,18 @@ class DevTool : Program {
     int  verbosity;   // int Flag: -v → 1, -vv → 2, -vvv → 3
     bool quiet;
     bool color;
+    bool genCompletion;  // --generate-completion: write bash completion to stdout
+    bool genDocs;        // --generate-docs: write Markdown reference to stdout
 
     this() {
         super("devtool", "1.0.0");
         summary("A sample app demonstrating darkcommand features.");
 
-        this.addFlag!(verbosity)("v", "verbose", "Increase verbosity (stackable: -vvv)");
-        this.addFlag!(quiet)    ("q", "quiet",   "Suppress non-error output");
-        this.addFlag!(color)    (null, "color",   "Colorize output").negatable();
+        this.addFlag!(verbosity)    ("v", "verbose",             "Increase verbosity (stackable: -vvv)");
+        this.addFlag!(quiet)        ("q", "quiet",               "Suppress non-error output");
+        this.addFlag!(color)        (null, "color",               "Colorize output").negatable();
+        this.addFlag!(genCompletion)(null, "generate-completion", "Print bash completion script and exit");
+        this.addFlag!(genDocs)      (null, "generate-docs",       "Print Markdown command reference and exit");
 
         topicGroup("Build")
             .add(new BuildCmd())
@@ -33,6 +37,18 @@ class DevTool : Program {
     }
 
     override protected void setup() {
+        import std.stdio : stdout;
+
+        // Self-documentation flags bypass normal subcommand dispatch.
+        if (genCompletion) {
+            generateBashCompletion(stdout);
+            exitWith(0);
+        }
+        if (genDocs) {
+            generateMarkdownDocs(stdout);
+            exitWith(0);
+        }
+
         // setup() runs after program-level args are parsed, before subcommand dispatch.
         if (quiet && verbosity > 0)
             exitWith(1, "error: --quiet and --verbose are mutually exclusive");

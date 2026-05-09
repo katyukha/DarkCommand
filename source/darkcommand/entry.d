@@ -115,9 +115,13 @@ class EntryBuilder(T) {
         return this;
     }
 
-    EntryBuilder!T validateEachWith(bool delegate(T) pred, string msg) {
-        _spec.validators ~= new DelegateValidator!T(pred, msg);
-        return this;
+    // Not available for T[] (repeating) fields: calling it on string[] would
+    // silently no-op because DelegateValidator tries raw.to!(T[]) per token.
+    static if (!isRepeatingField!T) {
+        EntryBuilder!T validateEachWith(bool delegate(T) pred, string msg) {
+            _spec.validators ~= new DelegateValidator!T(pred, msg);
+            return this;
+        }
     }
 
     EntryBuilder!T acceptsFiles() {
@@ -133,13 +137,11 @@ class EntryBuilder(T) {
     }
 
     EntryBuilder!T completesAsFile() {
-        _spec.validators ~= new FileSystemValidator(FileSystemValidator.Mode.file, false);
         _spec.completionHint = EntrySpec.CompletionHint.file;
         return this;
     }
 
     EntryBuilder!T completesAsDirectory() {
-        _spec.validators ~= new FileSystemValidator(FileSystemValidator.Mode.directory, false);
         _spec.completionHint = EntrySpec.CompletionHint.directory;
         return this;
     }

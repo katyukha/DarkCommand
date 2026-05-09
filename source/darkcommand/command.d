@@ -58,6 +58,19 @@ class Command {
     string[] argsRest;
 
     this(string name, string summary = "") {
+        import std.ascii : isAlphaNum;
+        if (name.length == 0)
+            throw new DarkCommandException("command name must not be empty");
+        if (!isAlphaNum(name[0]))
+            throw new DarkCommandException(
+                "invalid command name '" ~ name ~
+                "': must start with an alphanumeric character");
+        foreach (c; name[1 .. $]) {
+            if (!isAlphaNum(c) && c != '-' && c != '_')
+                throw new DarkCommandException(
+                    "invalid command name '" ~ name ~
+                    "': invalid character '" ~ [c] ~ "'");
+        }
         _name    = name;
         _summary = summary;
     }
@@ -73,6 +86,9 @@ class Command {
     }
 
     Command defaultCommand(string name) {
+        if (_findSubcommand(name) is null)
+            throw new DarkCommandException(
+                "defaultCommand: no subcommand named '" ~ name ~ "'");
         _defaultCommand = name;
         return this;
     }
@@ -81,7 +97,11 @@ class Command {
         return new TopicGroup(this, groupName);
     }
 
-    package void _addSubcommand(Command sub, string group) {
+    package(darkcommand) void _addSubcommand(Command sub, string group) {
+        foreach (existing; _subcommands)
+            if (existing.name == sub.name)
+                throw new DarkCommandException(
+                    "duplicate subcommand name: '" ~ sub.name ~ "'");
         sub._parent = this;
         _subcommands      ~= sub;
         _subcommandGroups ~= group;
@@ -254,15 +274,16 @@ class Command {
 // ── Program ───────────────────────────────────────────────────────────────────
 
 class Program : Command {
-    private string _version;
-    private bool   _noAutoVersion;
+    package(darkcommand) string _version;
+    package(darkcommand) bool   _noAutoVersion;
 
     this(string name, string version_) {
         super(name, "");
         _version = version_;
     }
 
-    Program summary(string s) { _summary = s; return this; }
+    Program summary(string s)     { _summary = s; return this; }
+    Program noAutoVersion()       { _noAutoVersion = true; return this; }
 
     protected void setup() {}
 

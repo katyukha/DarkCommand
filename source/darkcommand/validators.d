@@ -56,20 +56,19 @@ class FileSystemValidator : IValidator {
     string validate(string path) {
         if (!_validateExistence)
             return null;
-        import std.file : exists, isFile, isDir;
-        if (!exists(path))
-            return "path does not exist: " ~ path;
-        final switch (_mode) {
-            case Mode.file:
-                if (!isFile(path))
-                    return "not a file: " ~ path;
-                break;
-            case Mode.directory:
-                if (!isDir(path))
-                    return "not a directory: " ~ path;
-                break;
+        import std.file : exists, isFile, isDir, FileException;
+        try {
+            if (!exists(path))
+                return "path does not exist: " ~ path;
+            final switch (_mode) {
+                case Mode.file:
+                    return isFile(path) ? null : "not a file: " ~ path;
+                case Mode.directory:
+                    return isDir(path) ? null : "not a directory: " ~ path;
+            }
+        } catch (FileException e) {
+            return "cannot access path: " ~ e.msg;
         }
-        return null;
     }
 }
 

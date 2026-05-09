@@ -931,3 +931,210 @@ unittest { // definition-time: long name with space rejected
         new BadName2();
     }());
 }
+
+// ── Command name validation ───────────────────────────────────────────────────
+
+unittest { // definition-time: empty command name rejected
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException(new Command(""));
+}
+
+unittest { // definition-time: command name with invalid character rejected
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException(new Command("bad name"));
+}
+
+// ── Version support ───────────────────────────────────────────────────────────
+
+unittest { // --version prints name + version to stdout and exits 0
+    import std.stdio : stdout, File;
+    import std.string : strip;
+    auto tmp   = File.tmpfile();
+    auto saved = stdout;
+    stdout = tmp;
+    int code = new BoolFlagApp().run(["app", "--version"]);
+    tmp.flush();
+    stdout = saved;
+    assert(code == 0);
+    tmp.seek(0);
+    char[] line;
+    tmp.readln(line);
+    assert(line.strip == "app 1.0.0", cast(string) line);
+}
+
+unittest { // noAutoVersion(): --version treated as unknown option
+    auto app = new BoolFlagApp();
+    app.noAutoVersion();
+    assertParseError(app, ["app", "--version"], "unknown option");
+}
+
+// ── Help always shows -h/--help and --version ─────────────────────────────────
+
+class ArgOnlyApp : Program {
+    string val;
+    this() {
+        super("app", "1.0.0");
+        this.addArgument!(val)("val", "A value");
+    }
+    override protected void setup() {}
+}
+
+unittest { // help: -h/--help shown even when command has no user-defined options
+    import std.stdio : stdout, File;
+    import std.string : indexOf;
+    auto tmp   = File.tmpfile();
+    auto saved = stdout;
+    stdout = tmp;
+    scope(exit) stdout = saved;
+    import darkcommand.help : printHelp;
+    printHelp(new ArgOnlyApp());
+    stdout.flush();
+    tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("--help") >= 0, content);
+}
+
+unittest { // help: --version shown for Program with auto-version enabled
+    import std.stdio : stdout, File;
+    import std.string : indexOf;
+    auto tmp   = File.tmpfile();
+    auto saved = stdout;
+    stdout = tmp;
+    scope(exit) stdout = saved;
+    import darkcommand.help : printHelp;
+    printHelp(new BoolFlagApp());
+    stdout.flush();
+    tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("--version") >= 0, content);
+}
+
+// ── Duplicate subcommand + defaultCommand existence ───────────────────────────
+
+unittest { // definition-time: duplicate subcommand name rejected
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException({
+        class DupSub : Program {
+            this() {
+                super("app", "1.0.0");
+                add(new SubDispatchCmd());
+                add(new SubDispatchCmd());
+            }
+        }
+        new DupSub();
+    }());
+}
+
+unittest { // definition-time: defaultCommand with nonexistent name rejected
+    import std.exception : assertThrown;
+    assertThrown!DarkCommandException({
+        class BadDef : Program {
+            this() {
+                super("app", "1.0.0");
+                add(new DefaultSub());
+                defaultCommand("nonexistent");
+            }
+        }
+        new BadDef();
+    }());
+}
+
+// ── Markdown newline in description ──────────────────────────────────────────
+
+class NewlineDescApp : Program {
+    string val;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!(val)("v", "value", "line1\nline2");
+    }
+    override protected void setup() {}
+}
+
+unittest { // markdown docs: newline in description does not break table row
+    import darkcommand.docs.markdown : generateMarkdownDocs;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new NewlineDescApp().generateMarkdownDocs(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("line1 line2") >= 0, content);
+}
+
+// ── Issue 1: validateEachWith on repeating T[] must be a compile-time error ───
+
+// validateEachWith on a T[] (repeating) field used to silently become a no-op
+// because DelegateValidator!(T[]) tried raw.to!(T[]) per token, always threw
+// ConvException, and was swallowed.  A static assert now prevents misuse.
+static assert(!__traits(compiles, {
+    import darkcommand.entry : EntrySpec, EntryBuilder;
+    auto spec = new EntrySpec();
+    string[] arr;
+    auto b = new EntryBuilder!(string[])(spec, &arr);
+    b.validateEachWith((string[] v) => v.length > 0, "msg");
+}));
+
+// ── Issue 2: bash completion — shell-special chars in acceptsValues escaped ───
+
+class EscapeValApp : Program {
+    string fmt;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!(fmt)("f", "format", "Format")
+            .acceptsValues(["a\"b", `c\d`]);  // " and \ need escaping in bash
+    }
+    override protected void setup() {}
+}
+
+unittest { // bash completion: double-quote in enum value is escaped as \"
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new EscapeValApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf(`a\"b`) >= 0, content);   // escaped form present
+}
+
+unittest { // bash completion: backslash in enum value is escaped as \\
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new EscapeValApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf(`c\\d`) >= 0, content);   // escaped form present
+}
+
+// ── Issue 3: markdown docs must include --help (and --version) ────────────────
+
+unittest { // markdown docs: --help always appears in options table
+    import darkcommand.docs.markdown : generateMarkdownDocs;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new ArgOnlyApp().generateMarkdownDocs(tmp);   // has no user-defined options
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("--help") >= 0, content);
+}
+
+unittest { // markdown docs: --version appears for Program with auto-version
+    import darkcommand.docs.markdown : generateMarkdownDocs;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new BoolFlagApp().generateMarkdownDocs(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    assert(content.indexOf("--version") >= 0, content);
+}

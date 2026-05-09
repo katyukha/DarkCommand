@@ -12,21 +12,16 @@ bool noColor() {
 }
 
 void printHelp(Command cmd) {
-    import std.stdio : write, writeln, writef, writefln;
-    import std.algorithm : map, maxElement;
-    import std.array : array;
+    import std.stdio : write, writeln, writefln;
 
-    // Usage line
-    bool hasOptions   = false;
+    // Usage line — [options] always present because --help is always available.
     bool hasArguments = false;
-    foreach (e; cmd._entries) {
+    foreach (e; cmd._entries)
         if (e.kind == EntrySpec.Kind.argument) hasArguments = true;
-        else                                    hasOptions   = true;
-    }
 
     write("Usage: ");
     _writeBreadcrumb(cmd);
-    if (hasOptions)   write(" [options]");
+    write(" [options]");
     foreach (e; cmd._entries)
         if (e.kind == EntrySpec.Kind.argument)
             write(" <" ~ e.displayName ~ ">");
@@ -38,25 +33,27 @@ void printHelp(Command cmd) {
         writeln(cmd.summary);
     }
 
-    // Options / Flags
-    if (hasOptions) {
-        writeln();
-        writeln("Options:");
-        foreach (e; cmd._entries) {
-            if (e.kind == EntrySpec.Kind.argument) continue;
-            string longPart = e.negatable
-                ? "--[no-]" ~ e.longName
-                : "--" ~ e.longName;
-            string names;
-            if (e.shortName.length && e.longName.length)
-                names = "  -" ~ e.shortName ~ ", " ~ longPart;
-            else if (e.shortName.length)
-                names = "  -" ~ e.shortName;
-            else
-                names = "      " ~ longPart;
-            writefln("%-28s  %s", names, e.desc);
-        }
-        writefln("%-28s  %s", "  -h, --help", "Show this help");
+    // Options / Flags — always shown; at minimum -h/--help (and --version for Programs).
+    writeln();
+    writeln("Options:");
+    foreach (e; cmd._entries) {
+        if (e.kind == EntrySpec.Kind.argument) continue;
+        string longPart = e.negatable
+            ? "--[no-]" ~ e.longName
+            : "--" ~ e.longName;
+        string names;
+        if (e.shortName.length && e.longName.length)
+            names = "  -" ~ e.shortName ~ ", " ~ longPart;
+        else if (e.shortName.length)
+            names = "  -" ~ e.shortName;
+        else
+            names = "      " ~ longPart;
+        writefln("%-28s  %s", names, e.desc);
+    }
+    writefln("%-28s  %s", "  -h, --help", "Show this help");
+    if (auto prog = cast(Program) cmd) {
+        if (!prog._noAutoVersion)
+            writefln("%-28s  %s", "      --version", "Show version");
     }
 
     // Arguments

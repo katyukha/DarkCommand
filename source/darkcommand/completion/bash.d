@@ -29,6 +29,12 @@ private string _safe(string s) {
     return r.idup;
 }
 
+// Escape a completion value for embedding inside a bash double-quoted string.
+private string _bashEscapeValue(string s) {
+    import std.array : replace;
+    return s.replace("\\", "\\\\").replace("\"", "\\\"");
+}
+
 // Main entry point: collects the subcommand path from COMP_WORDS, then calls
 // the dispatch function with the path as positional arguments.
 private void _writeEntryFn(ref Appender!string buf, string fn) {
@@ -108,10 +114,12 @@ private void _writeOneFn(ref Appender!string buf, Command cmd,
             if (e.kind == EntrySpec.Kind.flag) continue;
 
             string rhs;
-            if (e.completionValues.length)
-                rhs = "COMPREPLY=($(compgen -W \"" ~ e.completionValues.join(" ") ~
+            if (e.completionValues.length) {
+                string[] escaped;
+                foreach (v; e.completionValues) escaped ~= _bashEscapeValue(v);
+                rhs = "COMPREPLY=($(compgen -W \"" ~ escaped.join(" ") ~
                       "\" -- \"$cur\")); return";
-            else if (e.completionHint == EntrySpec.CompletionHint.file)
+            } else if (e.completionHint == EntrySpec.CompletionHint.file)
                 rhs = "COMPREPLY=($(compgen -f -- \"$cur\")); return";
             else if (e.completionHint == EntrySpec.CompletionHint.directory)
                 rhs = "COMPREPLY=($(compgen -d -- \"$cur\")); return";

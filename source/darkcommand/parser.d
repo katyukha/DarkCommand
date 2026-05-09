@@ -76,6 +76,15 @@ private Command _parseOne(Command cmd, ref string[] argv) {
                 throw new DarkCommandExitException(0);
             }
 
+            // --version short-circuit (root Program only)
+            if (name == "version") {
+                if (auto prog = cast(Program) cmd) if (!prog._noAutoVersion) {
+                    import std.stdio : stdout;
+                    stdout.writeln(prog.name ~ " " ~ prog._version);
+                    throw new DarkCommandExitException(0);
+                }
+            }
+
             // --no-X form for negatable bool flags
             if (name.length > 3 && name[0 .. 3] == "no-") {
                 EntrySpec negSpec = _findNegatable(cmd, name[3 .. $]);
