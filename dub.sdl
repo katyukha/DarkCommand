@@ -19,6 +19,6 @@ configuration "integration" {
     mainSourceFile "source/integration/main.d"
     sourcePaths "source/darkcommand" "source/integration"
     importPaths "source"
-    dependency "thepath" path="../thepath"
-    dependency "theprocess" path="../theprocess"
+    dependency "thepath" version=">=2.3.0"
+    dependency "theprocess" version=">=0.1.1"
 }
