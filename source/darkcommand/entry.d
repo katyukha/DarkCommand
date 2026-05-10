@@ -121,6 +121,12 @@ class EntryBuilder(T) {
             _spec.validators ~= new DelegateValidator!(ElementType!T)(pred, msg);
             return this;
         }
+    } else static if (isNullable!T) {
+        // Predicate receives the inner type, matching what the parser converts to.
+        EntryBuilder!T validateEachWith(bool delegate(NullableTarget!T) pred, string msg) {
+            _spec.validators ~= new DelegateValidator!(NullableTarget!T)(pred, msg);
+            return this;
+        }
     } else {
         EntryBuilder!T validateEachWith(bool delegate(T) pred, string msg) {
             _spec.validators ~= new DelegateValidator!T(pred, msg);

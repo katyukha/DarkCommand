@@ -223,6 +223,16 @@ class PathOptApp : Program {
     override protected void setup() {}
 }
 
+class NullablePathApp : Program {
+    import std.typecons : Nullable;
+    Nullable!Path output;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!(output)("o", "output", "Output path");
+    }
+    override protected void setup() {}
+}
+
 void testPathType() {
     writeln("  thepath.Path fields parsed via std.conv.to!Path");
     auto app = new PathOptApp();
@@ -231,6 +241,16 @@ void testPathType() {
     assert(app.inputs.length == 2,                "expected 2 inputs");
     assert(app.inputs[0] == Path("a.txt"),        "first input mismatch");
     assert(app.inputs[1] == Path("b.txt"),        "second input mismatch");
+
+    writeln("  Nullable!Path: absent → isNull, present → Path value");
+    auto napp = new NullablePathApp();
+    napp.parseOnly(["app"]);
+    assert(napp.output.isNull, "expected isNull when not provided");
+
+    napp = new NullablePathApp();
+    napp.parseOnly(["app", "--output", "out/file.txt"]);
+    assert(!napp.output.isNull,                   "expected non-null when provided");
+    assert(napp.output.get == Path("out/file.txt"), "Nullable!Path value mismatch");
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────

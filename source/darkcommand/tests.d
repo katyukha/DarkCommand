@@ -434,6 +434,29 @@ unittest { // custom struct option/argument: parsed via std.conv.to!T(string)
     assert(app.inputs[1].value == "b.txt");
 }
 
+class NullableCustomTypeOptApp : Program {
+    import std.typecons : Nullable;
+    Nullable!CustomPath output;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!(output)("o", "output", "Output path");
+    }
+    override protected void setup() {}
+}
+
+unittest { // Nullable!CustomStruct: absent → isNull, present → value
+    import std.typecons : Nullable;
+
+    auto app = new NullableCustomTypeOptApp();
+    app.parseOnly(["app"]);
+    assert(app.output.isNull);
+
+    app = new NullableCustomTypeOptApp();
+    app.parseOnly(["app", "--output", "out/result.txt"]);
+    assert(!app.output.isNull);
+    assert(app.output.get.value == "out/result.txt");
+}
+
 unittest { // positional argument: present → value, absent → error
     auto app = new PosArgApp();
     app.parseOnly(["app", "alice"]);
