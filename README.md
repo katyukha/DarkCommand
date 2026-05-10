@@ -70,6 +70,25 @@ Building src with 8 jobs (release=true)
 | `T[]` (Option) | `addOption` | zero or more; accumulated |
 | `T[]` (Argument) | `addArgument` | one or more; error if absent |
 
+`T` can be any type that `std.conv.to!T` can construct from a `string` — including custom structs with a `this(string)` constructor. For example, `thepath.Path` works directly as a field type with no extra registration:
+
+```d
+import thepath : Path;
+
+class MyCmd : Program {
+    Path output;
+    Path[] inputs;
+    this() {
+        super("mytool", "1.0.0");
+        this.addOption!  (output)("o", "output", "Output path");
+        this.addArgument!(inputs)("inputs",       "Input paths");
+    }
+    override protected void setup() {}
+}
+// mytool --output out/result.txt a.txt b.txt
+// → output == Path("out/result.txt"), inputs == [Path("a.txt"), Path("b.txt")]
+```
+
 ## Fluent builder
 
 ```d

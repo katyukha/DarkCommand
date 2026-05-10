@@ -409,6 +409,31 @@ unittest { // typed option: int conversion, bad value → error with "cannot con
     assertParseError(new TypedOptApp(), ["app", "--port", "notanumber"], "cannot convert");
 }
 
+// Any type that std.conv.to!T can construct from a string works as an option or
+// argument field type — no special registration needed.  This includes custom
+// structs with a this(string) constructor (e.g. thepath.Path).
+struct CustomPath { string value; this(string s) { value = s; } }
+
+class CustomTypeOptApp : Program {
+    CustomPath output;
+    CustomPath[] inputs;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!  (output)("o", "output", "Output path");
+        this.addArgument!(inputs)("inputs", "Input paths");
+    }
+    override protected void setup() {}
+}
+
+unittest { // custom struct option/argument: parsed via std.conv.to!T(string)
+    auto app = new CustomTypeOptApp();
+    app.parseOnly(["app", "--output", "out/result.txt", "a.txt", "b.txt"]);
+    assert(app.output.value  == "out/result.txt");
+    assert(app.inputs.length == 2);
+    assert(app.inputs[0].value == "a.txt");
+    assert(app.inputs[1].value == "b.txt");
+}
+
 unittest { // positional argument: present → value, absent → error
     auto app = new PosArgApp();
     app.parseOnly(["app", "alice"]);

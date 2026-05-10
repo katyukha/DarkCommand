@@ -206,6 +206,33 @@ printf '%s\n' "${COMPREPLY[@]}"
     });
 }
 
+// ── thepath.Path integration ──────────────────────────────────────────────────
+//
+// thepath.Path has a this(string) constructor, so std.conv.to!Path(str) works.
+// No special registration is needed — any such type works as an option or
+// argument field in darkcommand.
+
+class PathOptApp : Program {
+    Path output;
+    Path[] inputs;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!  (output)("o", "output", "Output path");
+        this.addArgument!(inputs)("inputs", "Input paths");
+    }
+    override protected void setup() {}
+}
+
+void testPathType() {
+    writeln("  thepath.Path fields parsed via std.conv.to!Path");
+    auto app = new PathOptApp();
+    app.parseOnly(["app", "--output", "out/result.txt", "a.txt", "b.txt"]);
+    assert(app.output  == Path("out/result.txt"), "output path mismatch");
+    assert(app.inputs.length == 2,                "expected 2 inputs");
+    assert(app.inputs[0] == Path("a.txt"),        "first input mismatch");
+    assert(app.inputs[1] == Path("b.txt"),        "second input mismatch");
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 int main() {
@@ -218,6 +245,9 @@ int main() {
         testEnumOption();
         testFileArgCompletion();
         testSubcommandDispatch();
+        writeln("All integration tests passed.");
+        writeln("Running thepath integration tests...");
+        testPathType();
         writeln("All integration tests passed.");
         return 0;
     } else {
