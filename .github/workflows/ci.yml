@@ -33,3 +33,7 @@ jobs:
       - name: Build demo
         working-directory: examples/demo
         run: dub build
+
+      - name: Bash completion integration tests
+        if: matrix.os == 'ubuntu-latest'
+        run: dub run --config integration

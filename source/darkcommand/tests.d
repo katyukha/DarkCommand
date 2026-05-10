@@ -108,6 +108,24 @@ class RepArgApp : Program {
     override protected void setup() {}
 }
 
+class FileArgApp : Program {
+    string[] files;
+    this() {
+        super("app", "1.0.0");
+        this.addArgument!(files)("files", "Input files").acceptsFiles();
+    }
+    override protected void setup() {}
+}
+
+class DirArgApp : Program {
+    string[] dirs;
+    this() {
+        super("app", "1.0.0");
+        this.addArgument!(dirs)("dirs", "Input directories").acceptsDirectories();
+    }
+    override protected void setup() {}
+}
+
 class ArgsRestApp : Program {
     this() { super("app", "1.0.0"); }
     override protected void setup() {}
@@ -722,6 +740,43 @@ unittest { // bash completion: enum values and file completion hints
 
     assert(content.indexOf("json csv") >= 0);   // enum values for --format
     assert(content.indexOf("compgen -f") >= 0); // file completion for --output
+}
+
+unittest { // bash completion: T[] argument with acceptsDirectories emits directory completion in fallback
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+
+    auto tmp = File.tmpfile();
+    new DirArgApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+
+    string content;
+    char[] line;
+    while (tmp.readln(line)) content ~= line;
+
+    assert(content.indexOf("\"--\"") < 0,         "bogus -- pattern must not be emitted for argument entries");
+    assert(content.indexOf("compgen -d") >= 0,    "expected directory completion for dirs argument");
+    assert(content.indexOf("cur\" != -*") >= 0,   "expected non-option guard for positional directory completion");
+}
+
+unittest { // bash completion: T[] argument with acceptsFiles emits file completion in fallback
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+
+    auto tmp = File.tmpfile();
+    new FileArgApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+
+    string content;
+    char[] line;
+    while (tmp.readln(line)) content ~= line;
+
+    // file completion must appear in the positional fallback, not as a bogus "--)" case
+    assert(content.indexOf("\"--\"") < 0,         "bogus -- pattern must not be emitted for argument entries");
+    assert(content.indexOf("compgen -f") >= 0,    "expected file completion for files argument");
+    assert(content.indexOf("cur\" != -*") >= 0,   "expected non-option guard for positional file completion");
 }
 
 // ── Markdown docs ─────────────────────────────────────────────────────────────

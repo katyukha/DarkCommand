@@ -5,6 +5,20 @@ copyright "Copyright © 2026, Dmytro Katyukha"
 license "MPL-2.0"
 targetType "library"
 targetPath "build"
-sourcePaths "source"
+sourcePaths "source/darkcommand"
 importPaths "source"
 tags "cli" "argument-parsing" "command" "subcommand" "terminal"
+
+configuration "library" {
+    targetType "library"
+}
+
+configuration "integration" {
+    targetType "executable"
+    targetPath "build"
+    mainSourceFile "source/integration/main.d"
+    sourcePaths "source/darkcommand" "source/integration"
+    importPaths "source"
+    dependency "thepath" path="../thepath"
+    dependency "theprocess" path="../theprocess"
+}

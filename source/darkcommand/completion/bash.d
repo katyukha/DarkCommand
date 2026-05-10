@@ -102,6 +102,7 @@ private void _writeOneFn(ref Appender!string buf, Command cmd,
     bool hasPrevCases = false;
     foreach (e; cmd._entries) {
         if (e.kind == EntrySpec.Kind.flag) continue;
+        if (e.kind == EntrySpec.Kind.argument) continue;
         if (e.completionValues.length ||
             e.completionHint != EntrySpec.CompletionHint.none) {
             hasPrevCases = true; break;
@@ -112,6 +113,7 @@ private void _writeOneFn(ref Appender!string buf, Command cmd,
         buf ~= "    case \"$prev\" in\n";
         foreach (e; cmd._entries) {
             if (e.kind == EntrySpec.Kind.flag) continue;
+            if (e.kind == EntrySpec.Kind.argument) continue;
 
             string rhs;
             if (e.completionValues.length) {
@@ -156,5 +158,18 @@ private void _writeOneFn(ref Appender!string buf, Command cmd,
     }
 
     buf ~= "    COMPREPLY=($(compgen -W \"" ~ words.join(" ") ~ "\" -- \"$cur\"))\n";
+
+    // Positional argument file/dir completion: offered when cur is not an option flag.
+    foreach (e; cmd._entries) {
+        if (e.kind != EntrySpec.Kind.argument) continue;
+        if (e.completionHint == EntrySpec.CompletionHint.file) {
+            buf ~= "    [[ \"$cur\" != -* ]] && COMPREPLY+=($(compgen -f -- \"$cur\"))\n";
+            break;
+        } else if (e.completionHint == EntrySpec.CompletionHint.directory) {
+            buf ~= "    [[ \"$cur\" != -* ]] && COMPREPLY+=($(compgen -d -- \"$cur\"))\n";
+            break;
+        }
+    }
+
     buf ~= "}\n\n";
 }
