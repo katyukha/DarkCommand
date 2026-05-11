@@ -104,7 +104,8 @@ private void _writeOneFn(ref Appender!string buf, Command cmd,
         if (e.kind == EntrySpec.Kind.flag) continue;
         if (e.kind == EntrySpec.Kind.argument) continue;
         if (e.completionValues.length ||
-            e.completionHint != EntrySpec.CompletionHint.none) {
+            e.completionHint != EntrySpec.CompletionHint.none ||
+            e.completionCommand.length) {
             hasPrevCases = true; break;
         }
     }
@@ -121,6 +122,9 @@ private void _writeOneFn(ref Appender!string buf, Command cmd,
                 foreach (v; e.completionValues) escaped ~= _bashEscapeValue(v);
                 rhs = "COMPREPLY=($(compgen -W \"" ~ escaped.join(" ") ~
                       "\" -- \"$cur\")); return";
+            } else if (e.completionCommand.length) {
+                rhs = "COMPREPLY=($(compgen -W \"$(" ~ e.completionCommand ~
+                      " 2>/dev/null)\" -- \"$cur\")); return";
             } else if (e.completionHint == EntrySpec.CompletionHint.file)
                 rhs = "COMPREPLY=($(compgen -f -- \"$cur\")); return";
             else if (e.completionHint == EntrySpec.CompletionHint.directory)

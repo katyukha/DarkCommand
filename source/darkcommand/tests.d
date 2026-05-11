@@ -316,6 +316,18 @@ class GenDocsApp : Program {
     override protected void setup() {}
 }
 
+class DynCompleteApp : Program {
+    string database;
+    string host;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!(database)("d", "database", "Database name")
+            .completesWithCommand("app db list --names-only");
+        this.addOption!(host)("H", "host", "Host");
+    }
+    override protected void setup() {}
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 unittest { // bool flag: absent → false, -q → true, --quiet → true
@@ -1575,4 +1587,28 @@ unittest { // markdown docs: --version appears for Program with auto-version
     string content; char[] line;
     while (tmp.readln(line)) content ~= line;
     assert(content.indexOf("--version") >= 0, content);
+}
+
+// ── bash completion: completesWithCommand ─────────────────────────────────────
+
+unittest { // bash completion: completesWithCommand emits dynamic subshell for --database
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+
+    auto tmp = File.tmpfile();
+    new DynCompleteApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+
+    // The prev-case for --database must invoke the external command via $()
+    assert(content.indexOf("-d|--database") >= 0,
+           "--database case missing: " ~ content);
+    assert(content.indexOf("$(app db list --names-only 2>/dev/null)") >= 0,
+           "dynamic subshell missing: " ~ content);
+    // --host has no special completion; it must NOT appear in the prev-case block
+    assert(content.indexOf("--host") < 0 || content.indexOf("-H|--host") < 0,
+           "--host must not have a prev-case entry");
 }

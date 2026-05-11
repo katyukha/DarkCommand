@@ -52,6 +52,7 @@ class EntrySpec {
     string[] completionValues; // populated by acceptsValues()
 
     bool negatable;  // --no-<longname> sets bool flag to false
+    string completionCommand; // shell command whose stdout provides completion words
 
     // Write delegates — set at registration time in Command.addFlag/addOption/addArgument.
     void delegate(string) writeValue;  // option / argument: raw string → field
@@ -153,6 +154,11 @@ class EntryBuilder(T) {
 
     EntryBuilder!T completesAsDirectory() {
         _spec.completionHint = EntrySpec.CompletionHint.directory;
+        return this;
+    }
+
+    EntryBuilder!T completesWithCommand(string cmd) {
+        _spec.completionCommand = cmd;
         return this;
     }
 
