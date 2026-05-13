@@ -102,10 +102,12 @@ private Command _parseOne(Command cmd, ref string[] argv) {
             if (spec is null) {
                 if (auto def = _defaultDispatch(cmd, argv, i, argSpecs, argIdx))
                     return def;
+                import std.algorithm : map;
+                import std.array : array;
                 string[] longs = _longNames(cmd);
-                string   hint  = suggest(name, longs);
                 string   msg   = "unknown option: --" ~ name;
-                if (hint !is null) msg ~= " (did you mean --" ~ hint ~ "?)";
+                string   hint  = didYouMean(suggestAll(name, longs).map!(h => "--" ~ h).array);
+                if (hint !is null) msg ~= " (" ~ hint ~ ")";
                 throw new DarkCommandException(msg);
             }
 
@@ -155,10 +157,12 @@ private Command _parseOne(Command cmd, ref string[] argv) {
                 if (spec is null) {
                     if (auto def = _defaultDispatch(cmd, argv, i, argSpecs, argIdx))
                         return def;
+                    import std.algorithm : map;
+                    import std.array : array;
                     string[] shorts = _shortNames(cmd);
-                    string   hint   = suggest(shortName, shorts);
                     string   msg    = "unknown flag: -" ~ shortName;
-                    if (hint !is null) msg ~= " (did you mean -" ~ hint ~ "?)";
+                    string   hint   = didYouMean(suggestAll(shortName, shorts).map!(h => "-" ~ h).array);
+                    if (hint !is null) msg ~= " (" ~ hint ~ ")";
                     throw new DarkCommandException(msg);
                 }
 
@@ -207,6 +211,20 @@ private Command _parseOne(Command cmd, ref string[] argv) {
 
         // Treat as positional argument.
         if (argIdx >= argSpecs.length) {
+            // Check for subcommand typo before forwarding to a defaultCommand.
+            // If the token resembles a sibling subcommand name, suggest it rather
+            // than forwarding blindly (which produces a confusing nested error).
+            if (cmd._subcommands.length > 0) {
+                import std.algorithm : map;
+                import std.array : array;
+                string[] names = cmd._subcommands.map!(s => s.name).array;
+                if (auto prog = cast(Program) cmd)
+                    foreach (s; prog._shortcuts) names ~= s.name;
+                string hint = didYouMean(suggestAll(tok, names));
+                if (hint !is null)
+                    throw new DarkCommandException(
+                        "unexpected argument: " ~ tok ~ " (" ~ hint ~ ")");
+            }
             if (auto def = _defaultDispatch(cmd, argv, i, argSpecs, argIdx))
                 return def;
             throw new DarkCommandException("unexpected argument: " ~ tok);

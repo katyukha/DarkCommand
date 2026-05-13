@@ -12,17 +12,16 @@ T parseOnly(T)(Program prog, string[] args) {
     return t;
 }
 
-void assertParseError(Program prog, string[] args, string substr = "") {
+string assertParseError(Program prog, string[] args, string substr = "") {
     import std.string : indexOf;
-    bool thrown = false;
     try { prog.parseOnly(args); }
     catch (DarkCommandException e) {
-        thrown = true;
         if (substr.length)
             assert(e.msg.indexOf(substr) >= 0,
                 "Expected '" ~ substr ~ "' in error: " ~ e.msg);
+        return e.msg;
     }
-    assert(thrown, "Expected DarkCommandException but none was thrown");
+    assert(false, "Expected DarkCommandException but none was thrown");
 }
 
 // ── Fixtures — all at module scope to avoid DMD dual-context deprecation ──────
@@ -274,6 +273,25 @@ class DefaultCmdApp : Program {
         super("app", "1.0.0");
         add(new DefaultSub());
         defaultCommand("serve");
+    }
+    override protected void setup() {}
+}
+
+// Two sibling subcommands + defaultCommand — mirrors the demo's ServerCmd shape.
+class StartSub : Command { this() { super("start", "Start"); } }
+class StopSub  : Command { this() { super("stop",  "Stop");  } }
+class DefaultSiblingCmd : Command {
+    this() {
+        super("server", "Server management");
+        add(new StartSub());
+        add(new StopSub());
+        defaultCommand("start");
+    }
+}
+class DefaultSiblingApp : Program {
+    this() {
+        super("app", "1.0.0");
+        add(new DefaultSiblingCmd());
     }
     override protected void setup() {}
 }
@@ -581,6 +599,27 @@ unittest { // definition-time: T[] argument not last
 
 unittest { // did-you-mean suggestion on unknown option
     assertParseError(new IntFlagApp(), ["app", "--vrebose"], "did you mean");
+}
+
+unittest { // did-you-mean suggestion on unknown subcommand (typo)
+    assertParseError(new SubDispatchApp(), ["app", "fo"], "did you mean");
+}
+
+unittest { // no suggestion when the typo is too far from any subcommand
+    assertParseError(new SubDispatchApp(), ["app", "xyzxyz"], "unexpected argument");
+}
+
+unittest { // did-you-mean suggestion when command has defaultCommand and token typos a sibling
+    // "app server s" — s is close to start/stop; must suggest rather than forward to default
+    assertParseError(new DefaultSiblingApp(), ["app", "server", "s"], "did you mean");
+}
+
+unittest { // did-you-mean lists multiple candidates when several are within threshold
+    // "st" → start (dist 3) and stop (dist 2): both within threshold → both listed
+    import std.string : indexOf;
+    auto err = assertParseError(new DefaultSiblingApp(), ["app", "server", "st"], "did you mean");
+    assert(err.indexOf("start") >= 0, "start missing: " ~ err);
+    assert(err.indexOf("stop")  >= 0, "stop missing: "  ~ err);
 }
 
 unittest { // exitWith: run() returns the exit code; non-zero message goes to stderr
@@ -1448,6 +1487,13 @@ class ShortcutApp : Program {
         addShortcut("lsd", ["db", "list"], "List databases");
     }
     override protected void setup() {}
+}
+
+unittest { // did-you-mean includes shortcut names as candidates
+    // "ls" is close to shortcut "lsd" (dist 1) — must appear in suggestion
+    import std.string : indexOf;
+    auto err = assertParseError(new ShortcutApp(), ["app", "ls"], "did you mean");
+    assert(err.indexOf("lsd") >= 0, "lsd missing from suggestion: " ~ err);
 }
 
 unittest { // shortcut: expands to full parse chain
