@@ -1596,6 +1596,22 @@ unittest { // bash completion: shortcut names appear in word list
     assert(content.indexOf("lsd") >= 0, content);
 }
 
+unittest { // bash completion: shortcut dispatch routes to target completion function
+    // "lsd" → ["db", "list"]; typing "app lsd <TAB>" must offer the same options as
+    // "app db list <TAB>", meaning the dispatch must route "lsd" to __app_db_list.
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new ShortcutApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    // The dispatch function must have a case for "lsd" that calls __app_db_list.
+    assert(content.indexOf("lsd)") >= 0,          "lsd case missing in dispatch: " ~ content);
+    assert(content.indexOf("__app_db_list") >= 0,  "__app_db_list call missing: " ~ content);
+}
+
 unittest { // markdown: shortcuts table appears with name and expansion
     import darkcommand.docs.markdown : generateMarkdownDocs;
     import std.stdio : File;

@@ -57,6 +57,26 @@ private void _writeDispatchFn(ref Appender!string buf, Command cmd, string fn) {
     buf ~= "}\n\n";
 }
 
+// Walk an expansion path through the command tree; return the target command and
+// its bash-safe path suffix, or false if any token is not found.
+private bool _resolveExpansion(Command root, string[] expansion,
+                                out Command target, out string targetPath)
+{
+    Command cur = root;
+    string  path;
+    foreach (tok; expansion) {
+        Command found;
+        foreach (sub; cur._subcommands)
+            if (sub.name == tok) { found = sub; break; }
+        if (found is null) return false;
+        path = (path.length ? path ~ "_" : "") ~ _safe(tok);
+        cur  = found;
+    }
+    target     = cur;
+    targetPath = path;
+    return true;
+}
+
 // Recursive case-statement writer.  `curPath` is the bash-safe suffix for the
 // completion function at the current level (empty = root).
 private void _writeCases(ref Appender!string buf, Command cmd,
@@ -73,6 +93,23 @@ private void _writeCases(ref Appender!string buf, Command cmd,
             buf ~= indent ~ "        " ~ fn ~ "_" ~ subPath ~ "\n";
         }
         buf ~= indent ~ "        ;;\n";
+    }
+    // At root level, add a dispatch case for each shortcut routing to its target.
+    if (curPath.length == 0) {
+        if (auto prog = cast(Program) cmd) {
+            foreach (s; prog._shortcuts) {
+                Command target; string targetPath;
+                if (!_resolveExpansion(cmd, s.expansion, target, targetPath)) continue;
+                buf ~= indent ~ "    " ~ s.name ~ ")\n";
+                if (target._subcommands.length > 0) {
+                    buf ~= indent ~ "        shift\n";
+                    _writeCases(buf, target, fn, targetPath, indent ~ "        ");
+                } else {
+                    buf ~= indent ~ "        " ~ fn ~ "_" ~ targetPath ~ "\n";
+                }
+                buf ~= indent ~ "        ;;\n";
+            }
+        }
     }
     // Fallback: complete at the current command level.
     immutable curFn = fn ~ (curPath.length ? "_" ~ curPath : "_root");
