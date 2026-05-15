@@ -1,6 +1,7 @@
 module darkcommand;
 
-public import darkcommand.exceptions : DarkCommandException, DarkCommandExitException;
+public import darkcommand.exceptions : DarkCommandException, DarkCommandExitException,
+                                       UnknownCommandException, UnknownOptionException;
 public import darkcommand.command    : Command, Program,
                                        TopicGroup,
                                        addFlag, addOption, addArgument;

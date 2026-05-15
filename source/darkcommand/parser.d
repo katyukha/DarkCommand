@@ -104,11 +104,14 @@ private Command _parseOne(Command cmd, ref string[] argv) {
                     return def;
                 import std.algorithm : map;
                 import std.array : array;
-                string[] longs = _longNames(cmd);
-                string   msg   = "unknown option: --" ~ name;
-                string   hint  = didYouMean(suggestAll(name, longs).map!(h => "--" ~ h).array);
-                if (hint !is null) msg ~= " (" ~ hint ~ ")";
-                throw new DarkCommandException(msg);
+                import darkcommand.exceptions : UnknownOptionException;
+                string[] longs    = _longNames(cmd);
+                string[] rawHints = suggestAll(name, longs);
+                string[] hints    = rawHints.map!(h => "--" ~ h).array;
+                string   msg      = "unknown option: --" ~ name;
+                string   hint     = didYouMean(hints);
+                if (hint !is null) msg ~= "; " ~ hint;
+                throw new UnknownOptionException("--" ~ name, hints, msg);
             }
 
             if (spec.isBoolFlag()) {
@@ -159,11 +162,14 @@ private Command _parseOne(Command cmd, ref string[] argv) {
                         return def;
                     import std.algorithm : map;
                     import std.array : array;
-                    string[] shorts = _shortNames(cmd);
-                    string   msg    = "unknown flag: -" ~ shortName;
-                    string   hint   = didYouMean(suggestAll(shortName, shorts).map!(h => "-" ~ h).array);
-                    if (hint !is null) msg ~= " (" ~ hint ~ ")";
-                    throw new DarkCommandException(msg);
+                    import darkcommand.exceptions : UnknownOptionException;
+                    string[] shorts   = _shortNames(cmd);
+                    string[] rawHints = suggestAll(shortName, shorts);
+                    string[] hints    = rawHints.map!(h => "-" ~ h).array;
+                    string   msg      = "unknown flag: -" ~ shortName;
+                    string   hint     = didYouMean(hints);
+                    if (hint !is null) msg ~= "; " ~ hint;
+                    throw new UnknownOptionException("-" ~ shortName, hints, msg);
                 }
 
                 if (spec.isBoolFlag()) {
@@ -220,13 +226,24 @@ private Command _parseOne(Command cmd, ref string[] argv) {
                 string[] names = cmd._subcommands.map!(s => s.name).array;
                 if (auto prog = cast(Program) cmd)
                     foreach (s; prog._shortcuts) names ~= s.name;
-                string hint = didYouMean(suggestAll(tok, names));
-                if (hint !is null)
-                    throw new DarkCommandException(
-                        "unexpected argument: " ~ tok ~ " (" ~ hint ~ ")");
+                string[] hints = suggestAll(tok, names);
+                if (hints.length > 0) {
+                    // Hook either throws (default) or returns a corrected subcommand name.
+                    string corrected = cmd._onUnknownCommand(tok, hints);
+                    Command sub2 = cmd._findSubcommand(corrected);
+                    if (sub2 is null)
+                        throw new DarkCommandException("unknown command '" ~ corrected ~ "'");
+                    argv = argv[i + 1 .. $];
+                    _finalize(cmd, argSpecs, argIdx);
+                    return sub2;
+                }
             }
             if (auto def = _defaultDispatch(cmd, argv, i, argSpecs, argIdx))
                 return def;
+            if (cmd._subcommands.length > 0) {
+                import darkcommand.exceptions : UnknownCommandException;
+                throw new UnknownCommandException(tok, [], "unknown command '" ~ tok ~ "'");
+            }
             throw new DarkCommandException("unexpected argument: " ~ tok);
         }
 

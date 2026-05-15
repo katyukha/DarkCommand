@@ -346,6 +346,26 @@ class DynCompleteApp : Program {
     override protected void setup() {}
 }
 
+// ── onUnknownCommand hook fixtures ───────────────────────────────────────────
+
+// Records the call and auto-corrects by picking the first suggestion.
+class AutoCorrectApp : Program {
+    string   hookedTok;
+    string[] hookedSuggestions;
+    this() {
+        super("app", "1.0.0");
+        add(new StartSub());
+        add(new StopSub());
+    }
+    override protected void setup() {}
+    override protected string onUnknownCommand(string tok, string[] suggestions) {
+        hookedTok         = tok;
+        hookedSuggestions = suggestions;
+        if (suggestions.length > 0) return suggestions[0];
+        throw new DarkCommandException("unknown command: " ~ tok);
+    }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 unittest { // bool flag: absent → false, -q → true, --quiet → true
@@ -601,12 +621,60 @@ unittest { // did-you-mean suggestion on unknown option
     assertParseError(new IntFlagApp(), ["app", "--vrebose"], "did you mean");
 }
 
+unittest { // onUnknownCommand: hook is called with tok and sorted suggestions
+    auto app = new AutoCorrectApp();
+    // "st" → stop (dist 2) then start (dist 3); hook auto-picks stop → dispatches StopSub
+    auto leaf = app.parseOnly(["app", "st"]);
+    assert(cast(StopSub) leaf !is null, "expected StopSub, got: " ~ typeid(leaf).name);
+    assert(app.hookedTok == "st");
+    assert(app.hookedSuggestions.length >= 2);
+    assert(app.hookedSuggestions[0] == "stop");
+    assert(app.hookedSuggestions[1] == "start");
+}
+
+unittest { // onUnknownCommand: default impl still throws with suggestion
+    assertParseError(new SubDispatchApp(), ["app", "fo"], "did you mean");
+}
+
+unittest { // onUnknownCommand: default throws UnknownCommandException carrying tok and suggestions
+    import std.conv : to;
+    try {
+        new SubDispatchApp().parseOnly(["app", "fo"]);
+        assert(false, "expected exception");
+    } catch (UnknownCommandException e) {
+        assert(e.tok         == "fo",    "tok: "         ~ e.tok);
+        assert(e.suggestions == ["foo"], "suggestions: " ~ e.suggestions.to!string);
+    }
+}
+
+unittest { // onError can pattern-match on UnknownCommandException
+    import std.string : indexOf;
+    class SensitiveApp : Program {
+        string lastMsg;
+        this() { super("app", "1.0.0"); add(new SubDispatchCmd()); }
+        override protected void setup() {}
+        override protected int onError(Exception e) {
+            import std.array : join;
+            if (auto uce = cast(UnknownCommandException) e) {
+                lastMsg = "choices: " ~ uce.suggestions.join(", ");
+                return 2;
+            }
+            return super.onError(e);
+        }
+    }
+    import std.array : join;
+    import std.conv : to;
+    auto app = new SensitiveApp();
+    assert(app.run(["app", "fo"]) == 2);
+    assert(app.lastMsg.indexOf("foo") >= 0, app.lastMsg);
+}
+
 unittest { // did-you-mean suggestion on unknown subcommand (typo)
     assertParseError(new SubDispatchApp(), ["app", "fo"], "did you mean");
 }
 
 unittest { // no suggestion when the typo is too far from any subcommand
-    assertParseError(new SubDispatchApp(), ["app", "xyzxyz"], "unexpected argument");
+    assertParseError(new SubDispatchApp(), ["app", "xyzxyz"], "unknown command");
 }
 
 unittest { // did-you-mean suggestion when command has defaultCommand and token typos a sibling
@@ -1649,6 +1717,100 @@ unittest { // markdown docs: --version appears for Program with auto-version
     string content; char[] line;
     while (tmp.readln(line)) content ~= line;
     assert(content.indexOf("--version") >= 0, content);
+}
+
+// ── UnknownOptionException ────────────────────────────────────────────────────
+
+unittest { // unknown --long option throws UnknownOptionException with input and suggestions
+    import std.conv : to;
+    try {
+        new IntFlagApp().parseOnly(["app", "--vrebose"]);
+        assert(false, "expected exception");
+    } catch (UnknownOptionException e) {
+        assert(e.input       == "--vrebose",  "input: "       ~ e.input);
+        assert(e.suggestions == ["--verbose"], "suggestions: " ~ e.suggestions.to!string);
+    }
+}
+
+unittest { // unknown -x short flag throws UnknownOptionException with input and suggestions
+    import std.conv : to;
+    try {
+        new IntFlagApp().parseOnly(["app", "-V"]);
+        assert(false, "expected exception");
+    } catch (UnknownOptionException e) {
+        assert(e.input       == "-V",  "input: "       ~ e.input);
+        assert(e.suggestions == ["-v"], "suggestions: " ~ e.suggestions.to!string);
+    }
+}
+
+unittest { // UnknownOptionException is exported from package.d
+    static assert(is(UnknownOptionException : DarkCommandException));
+}
+
+unittest { // onError can pattern-match on UnknownOptionException
+    import std.string : indexOf;
+    class SmartApp : Program {
+        string lastMsg;
+        this() { super("app", "1.0.0"); this.addFlag!(verbosity)("v", "verbose", "V"); }
+        int verbosity;
+        override protected void setup() {}
+        override protected int onError(Exception e) {
+            if (auto uoe = cast(UnknownOptionException) e) {
+                lastMsg = "input=" ~ uoe.input;
+                return 2;
+            }
+            return super.onError(e);
+        }
+    }
+    auto app = new SmartApp();
+    assert(app.run(["app", "--vrebose"]) == 2);
+    assert(app.lastMsg.indexOf("--vrebose") >= 0, app.lastMsg);
+}
+
+unittest { // default onError: unknown option produces two lines on stderr (error + suggestion)
+    import std.stdio : stderr, File;
+    import std.string : strip, indexOf;
+    class TwoLineApp : Program {
+        int verbosity;
+        this() { super("app", "1.0.0"); this.addFlag!(verbosity)("v", "verbose", "Verbose"); }
+        override protected void setup() {}
+    }
+    auto tmp = File.tmpfile();
+    auto saved = stderr;
+    stderr = tmp;
+    auto app = new TwoLineApp();
+    int code = app.run(["app", "--vrebose"]);
+    tmp.flush();
+    stderr = saved;
+    assert(code == 1);
+    tmp.seek(0);
+    char[] lines; char[] line;
+    while (tmp.readln(line)) lines ~= line;
+    string output = cast(string) lines;
+    assert(output.indexOf("unknown option") >= 0, "first line missing: " ~ output);
+    assert(output.indexOf("did you mean") >= 0,   "suggestion line missing: " ~ output);
+    assert(output.indexOf("--vrebose") < output.indexOf("did you mean"),
+           "suggestion must be on second line: " ~ output);
+}
+
+unittest { // default onError: UnknownCommandException produces two lines on stderr
+    import std.stdio : stderr, File;
+    import std.string : strip, indexOf;
+    auto tmp = File.tmpfile();
+    auto saved = stderr;
+    stderr = tmp;
+    int code = new SubDispatchApp().run(["app", "fo"]);
+    tmp.flush();
+    stderr = saved;
+    assert(code == 1);
+    tmp.seek(0);
+    char[] lines; char[] line;
+    while (tmp.readln(line)) lines ~= line;
+    string output = cast(string) lines;
+    assert(output.indexOf("unknown command") >= 0, "first line missing: " ~ output);
+    assert(output.indexOf("did you mean") >= 0,    "suggestion line missing: " ~ output);
+    assert(output.indexOf("unknown command") < output.indexOf("did you mean"),
+           "suggestion must be on second line: " ~ output);
 }
 
 // ── bash completion: completesWithCommand ─────────────────────────────────────

@@ -6,7 +6,8 @@ private import std.stdio  : File;
 private import std.traits : isDynamicArray;
 private import std.range  : ElementType;
 
-public import darkcommand.exceptions : DarkCommandException, DarkCommandExitException;
+public import darkcommand.exceptions : DarkCommandException, DarkCommandExitException,
+                                       UnknownCommandException, UnknownOptionException;
 
 // ── TopicGroup ────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,24 @@ class Command {
 
     protected void afterParse() {}
     protected void validate()   {}
+
+    // Called when a positional token is unrecognized as a subcommand and
+    // `suggestions` contains close matches sorted by distance.
+    // Default: throws DarkCommandException with the suggestion message.
+    // Override: return a valid subcommand name to dispatch to instead.
+    protected string onUnknownCommand(string tok, string[] suggestions) {
+        import darkcommand.utils : didYouMean;
+        import darkcommand.exceptions : UnknownCommandException;
+        string msg = "unknown command '" ~ tok ~ "'";
+        string hint = didYouMean(suggestions);
+        if (hint !is null) msg ~= "; " ~ hint;
+        throw new UnknownCommandException(tok, suggestions, msg);
+    }
+
+    // Package wrapper so parser.d can call the protected hook.
+    package(darkcommand) final string _onUnknownCommand(string tok, string[] suggestions) {
+        return onUnknownCommand(tok, suggestions);
+    }
 
     int execute() {
         if (_subcommands.length > 0) {
@@ -332,7 +351,25 @@ class Program : Command {
     protected int onError(Exception e) {
         import std.stdio : stderr;
         import darkcommand.ansi : _red, _stderrColorEnabled;
-        stderr.writeln(_red("Error: ", _stderrColorEnabled()), e.msg);
+        import darkcommand.utils : didYouMean;
+        import darkcommand.exceptions : UnknownCommandException, UnknownOptionException;
+        bool color = _stderrColorEnabled();
+        if (auto uce = cast(UnknownCommandException) e) {
+            stderr.writeln(_red("Error: ", color), "unknown command '" ~ uce.tok ~ "'");
+            string hint = didYouMean(uce.suggestions);
+            if (hint !is null) stderr.writeln("       " ~ hint);
+            return 1;
+        }
+        if (auto uoe = cast(UnknownOptionException) e) {
+            string mainMsg = uoe.input.length >= 2 && uoe.input[0 .. 2] == "--"
+                ? "unknown option: " ~ uoe.input
+                : "unknown flag: "   ~ uoe.input;
+            stderr.writeln(_red("Error: ", color), mainMsg);
+            string hint = didYouMean(uoe.suggestions);
+            if (hint !is null) stderr.writeln("       " ~ hint);
+            return 1;
+        }
+        stderr.writeln(_red("Error: ", color), e.msg);
         return 1;
     }
 
