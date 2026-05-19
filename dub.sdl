@@ -13,6 +13,10 @@ configuration "library" {
     targetType "library"
 }
 
+configuration "sourceLibrary" {
+    targetType "sourceLibrary"
+}
+
 configuration "integration" {
     targetType "executable"
     targetPath "build"

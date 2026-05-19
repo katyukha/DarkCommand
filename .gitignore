@@ -18,3 +18,4 @@ darkcommand-test-*
 *.obj
 *.lst
 *.sw[npo]
+dub.selections.json
