@@ -162,7 +162,8 @@ private void _writeOneFn(ref Appender!string buf, Command cmd,
             } else if (e.completionCommand.length) {
                 rhs = "COMPREPLY=($(compgen -W \"$(" ~ e.completionCommand ~
                       " 2>/dev/null)\" -- \"$cur\")); return";
-            } else if (e.completionHint == EntrySpec.CompletionHint.file)
+            } else if (e.completionHint == EntrySpec.CompletionHint.file ||
+                       e.completionHint == EntrySpec.CompletionHint.path)
                 rhs = "COMPREPLY=($(compgen -f -- \"$cur\")); return";
             else if (e.completionHint == EntrySpec.CompletionHint.directory)
                 rhs = "COMPREPLY=($(compgen -d -- \"$cur\")); return";
@@ -203,7 +204,8 @@ private void _writeOneFn(ref Appender!string buf, Command cmd,
     // Positional argument file/dir completion: offered when cur is not an option flag.
     foreach (e; cmd._entries) {
         if (e.kind != EntrySpec.Kind.argument) continue;
-        if (e.completionHint == EntrySpec.CompletionHint.file) {
+        if (e.completionHint == EntrySpec.CompletionHint.file ||
+            e.completionHint == EntrySpec.CompletionHint.path) {
             buf ~= "    [[ \"$cur\" != -* ]] && COMPREPLY+=($(compgen -f -- \"$cur\"))\n";
             break;
         } else if (e.completionHint == EntrySpec.CompletionHint.directory) {

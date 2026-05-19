@@ -47,7 +47,7 @@ class EntrySpec {
     IValidator[] validators;
 
     // Completion hints — set by EntryBuilder fluent methods.
-    enum CompletionHint { none, file, directory }
+    enum CompletionHint { none, file, directory, path }
     CompletionHint completionHint;
     string[] completionValues; // populated by acceptsValues()
 
@@ -154,6 +154,17 @@ class EntryBuilder(T) {
 
     EntryBuilder!T completesAsDirectory() {
         _spec.completionHint = EntrySpec.CompletionHint.directory;
+        return this;
+    }
+
+    EntryBuilder!T acceptsPath() {
+        _spec.validators ~= new FileSystemValidator(FileSystemValidator.Mode.path, true);
+        _spec.completionHint = EntrySpec.CompletionHint.path;
+        return this;
+    }
+
+    EntryBuilder!T completesAsPath() {
+        _spec.completionHint = EntrySpec.CompletionHint.path;
         return this;
     }
 

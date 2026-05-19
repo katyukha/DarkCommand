@@ -125,6 +125,24 @@ class DirArgApp : Program {
     override protected void setup() {}
 }
 
+class PathArgApp : Program {
+    string[] paths;
+    this() {
+        super("app", "1.0.0");
+        this.addArgument!(paths)("paths", "Input paths").acceptsPath();
+    }
+    override protected void setup() {}
+}
+
+class PathOptApp : Program {
+    string src;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!(src)("s", "src", "Source path").completesAsPath();
+    }
+    override protected void setup() {}
+}
+
 class ArgsRestApp : Program {
     this() { super("app", "1.0.0"); }
     override protected void setup() {}
@@ -944,6 +962,58 @@ unittest { // bash completion: T[] argument with acceptsFiles emits file complet
     assert(content.indexOf("\"--\"") < 0,         "bogus -- pattern must not be emitted for argument entries");
     assert(content.indexOf("compgen -f") >= 0,    "expected file completion for files argument");
     assert(content.indexOf("cur\" != -*") >= 0,   "expected non-option guard for positional file completion");
+}
+
+unittest { // acceptsPath: existing file is accepted, existing directory is accepted, missing path rejected
+    import std.file : tempDir, exists;
+    import std.path : buildPath;
+
+    string existingFile = __FILE__;  // this source file always exists
+    string existingDir  = tempDir(); // /tmp or equivalent, always a directory
+    string missingPath  = buildPath(tempDir(), "darkcommand_nonexistent_path_xyz");
+
+    auto app = new PathArgApp();
+    app.parseOnly(["app", existingFile]);
+
+    app = new PathArgApp();
+    app.parseOnly(["app", existingDir]);
+
+    assertParseError(new PathArgApp(), ["app", missingPath], "does not exist");
+}
+
+unittest { // bash completion: T[] argument with acceptsPath emits file completion in fallback
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+
+    auto tmp = File.tmpfile();
+    new PathArgApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+
+    string content;
+    char[] line;
+    while (tmp.readln(line)) content ~= line;
+
+    assert(content.indexOf("\"--\"") < 0,       "bogus -- pattern must not be emitted for argument entries");
+    assert(content.indexOf("compgen -f") >= 0,  "expected file completion for paths argument");
+    assert(content.indexOf("cur\" != -*") >= 0, "expected non-option guard for positional path completion");
+}
+
+unittest { // bash completion: completesAsPath on option emits compgen -f in case block
+    import darkcommand.completion.bash : generateBashCompletion;
+    import std.stdio : File;
+    import std.string : indexOf;
+
+    auto tmp = File.tmpfile();
+    new PathOptApp().generateBashCompletion(tmp);
+    tmp.flush(); tmp.seek(0);
+
+    string content;
+    char[] line;
+    while (tmp.readln(line)) content ~= line;
+
+    assert(content.indexOf("compgen -f") >= 0, "expected file completion for --src option");
+    assert(content.indexOf("-s|--src") >= 0,   "expected -s|--src pattern in case block");
 }
 
 // ── Markdown docs ─────────────────────────────────────────────────────────────

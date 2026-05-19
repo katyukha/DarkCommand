@@ -97,7 +97,10 @@ this.addOption!(format)("f", "format", "Output format")
     .defaultValue("json");
 
 this.addArgument!(inputFile)("input", "Input file")
-    .acceptsFiles();                           // validates existence + file completion hint
+    .acceptsFiles();                           // validates existence (file) + completion hint
+
+this.addArgument!(source)("source", "File or directory")
+    .acceptsPath();                            // validates existence (file or directory) + completion hint
 
 this.addOption!(count)("n", "count", "Count")
     .validateEachWith(v => v > 0, "must be positive");

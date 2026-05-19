@@ -43,7 +43,7 @@ class DelegateValidator(T) : IValidator {
 }
 
 class FileSystemValidator : IValidator {
-    enum Mode { file, directory }
+    enum Mode { file, directory, path }
 
     private Mode _mode;
     private bool _validateExistence;
@@ -65,6 +65,8 @@ class FileSystemValidator : IValidator {
                     return isFile(path) ? null : "not a file: " ~ path;
                 case Mode.directory:
                     return isDir(path) ? null : "not a directory: " ~ path;
+                case Mode.path:
+                    return null;
             }
         } catch (FileException e) {
             return "cannot access path: " ~ e.msg;
@@ -84,4 +86,9 @@ unittest {
 
     auto fv = new FileSystemValidator(FileSystemValidator.Mode.file, false);
     assert(fv.validate("/nonexistent/path") is null); // no existence check
+
+    import std.file : tempDir;
+    auto pv = new FileSystemValidator(FileSystemValidator.Mode.path, true);
+    assert(pv.validate(tempDir()) is null);  // directory exists: ok
+    assert(pv.validate("/nonexistent-darkcommand-path-xyz") !is null);
 }
