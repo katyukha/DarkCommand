@@ -6,9 +6,16 @@ private import std.stdio : File;
 
 // Writes a Markdown command reference for `prog` to `output`.
 // Each command and subcommand gets its own section at increasing heading depth.
-void generateMarkdownDocs(Program prog, File output) {
-    _writeSection(output, cast(Command) prog, 1, "");
-}
+void generateMarkdownDocs(Program prog, File output, string title = "") {
+      if (title.length) {
+          output.writeln("# " ~ title);
+          output.writeln();
+          _writeSection(output, cast(Command) prog, 2, "");
+      } else {
+          _writeSection(output, cast(Command) prog, 1, "");
+      }
+  }
+
 
 // ── Private ───────────────────────────────────────────────────────────────────
 
