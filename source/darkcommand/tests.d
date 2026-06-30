@@ -107,6 +107,42 @@ class RepArgApp : Program {
     override protected void setup() {}
 }
 
+class RepArgDefaultApp : Program {
+    string[] files;
+    this() {
+        super("app", "1.0.0");
+        this.addArgument!(files)("files", "Input files").defaultValue(["fallback"]);
+    }
+    override protected void setup() {}
+}
+
+class RepArgRequiredApp : Program {
+    string[] files;
+    this() {
+        super("app", "1.0.0");
+        this.addArgument!(files)("files", "Input files").required();
+    }
+    override protected void setup() {}
+}
+
+class RepOptRequiredApp : Program {
+    string[] tags;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!(tags)(null, "tag", "Tag (one or more)").required();
+    }
+    override protected void setup() {}
+}
+
+class NullableArgApp : Program {
+    Nullable!string name;
+    this() {
+        super("app", "1.0.0");
+        this.addArgument!(name)("name", "Optional name");
+    }
+    override protected void setup() {}
+}
+
 class FileArgApp : Program {
     string[] files;
     this() {
@@ -533,12 +569,81 @@ unittest { // positional argument: present → value, absent → error
     assertParseError(new PosArgApp(), ["app"], "missing required argument: name");
 }
 
-unittest { // repeating positional T[]: one or more, absent → error
+unittest { // repeating positional T[]: zero-or-more by default
     auto app = new RepArgApp();
     app.parseOnly(["app", "a.txt", "b.txt", "c.txt"]);
     assert(app.files == ["a.txt", "b.txt", "c.txt"]);
 
-    assertParseError(new RepArgApp(), ["app"], "missing required argument: files");
+    // Absent is fine — the field is just empty.
+    auto empty = new RepArgApp();
+    empty.parseOnly(["app"]);
+    assert(empty.files == []);
+}
+
+unittest { // repeating positional T[] marked .required(): one-or-more, absent → error
+    auto app = new RepArgRequiredApp();
+    app.parseOnly(["app", "a.txt"]);
+    assert(app.files == ["a.txt"]);
+
+    assertParseError(new RepArgRequiredApp(), ["app"],
+        "missing required argument: files");
+}
+
+unittest { // repeating option marked .required(): one-or-more, absent → error
+    auto app = new RepOptRequiredApp();
+    app.parseOnly(["app", "--tag", "a", "--tag", "b"]);
+    assert(app.tags == ["a", "b"]);
+
+    assertParseError(new RepOptRequiredApp(), ["app"],
+        "missing required option: --tag");
+}
+
+unittest { // required() and defaultValue() are mutually exclusive on repeating fields
+    import darkcommand.exceptions : DarkCommandException;
+    bool threw = false;
+    try
+        new class Program {
+            string[] files;
+            this() {
+                super("app", "1.0.0");
+                this.addArgument!(files)("files", "f").required().defaultValue(["x"]);
+            }
+            override protected void setup() {}
+        };
+    catch (DarkCommandException) threw = true;
+    assert(threw, "required() + defaultValue() should be a definition-time error");
+}
+
+// Look up an entry by its CLI/display name within a command's _entries.
+private auto _entryNamed(Command cmd, string name) {
+    import darkcommand.entry : EntrySpec;
+    foreach (e; cmd._entries)
+        if (e.displayName == name || e.longName == name || e.shortName == name)
+            return e;
+    assert(false, "no entry named " ~ name);
+}
+
+unittest { // isRequired() reflects what the parser actually enforces
+    // Plain scalar argument: required.
+    assert(_entryNamed(new PosArgApp(), "name").isRequired());
+
+    // Repeating argument, no .required() (zero-or-more): NOT required.
+    assert(!_entryNamed(new RepArgApp(), "files").isRequired());
+
+    // Repeating argument marked .required() (one-or-more): required.
+    assert(_entryNamed(new RepArgRequiredApp(), "files").isRequired());
+
+    // Repeating option marked .required() (one-or-more): required.
+    assert(_entryNamed(new RepOptRequiredApp(), "tag").isRequired());
+
+    // Repeating argument with a default (zero-or-more): NOT required.
+    assert(!_entryNamed(new RepArgDefaultApp(), "files").isRequired());
+
+    // Nullable argument (optional): NOT required.
+    assert(!_entryNamed(new NullableArgApp(), "name").isRequired());
+
+    // Repeating option, no .required() (zero-or-more): NOT required.
+    assert(!_entryNamed(new RepeatingOptApp(), "tag").isRequired());
 }
 
 unittest { // argsRest: everything after -- goes to argsRest

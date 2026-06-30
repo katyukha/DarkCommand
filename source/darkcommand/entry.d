@@ -52,6 +52,7 @@ class EntrySpec {
     string[] completionValues; // populated by acceptsValues()
 
     bool negatable;  // --no-<longname> sets bool flag to false
+    bool oneOrMore;  // repeating field marked .required(): at least one value required
     string completionCommand; // shell command whose stdout provides completion words
 
     // Write delegates — set at registration time in Command.addFlag/addOption/addArgument.
@@ -68,7 +69,14 @@ class EntrySpec {
         return displayName;
     }
 
-    bool isRequired()   const { return fieldKind == FieldKind.required && !hasDefault; }
+    // Required = "parse error if absent", mirroring what the parser enforces.
+    // A repeating field (T[]) is zero-or-more by default; calling .required()
+    // sets `oneOrMore`, making it one-or-more (parse error if absent).
+    bool isRequired() const {
+        if (fieldKind == FieldKind.repeating) return oneOrMore;
+        if (hasDefault) return false;
+        return fieldKind == FieldKind.required;
+    }
     bool isBoolFlag()   const { return fieldKind == FieldKind.boolFlag; }
     bool isIntFlag()    const { return fieldKind == FieldKind.intFlag; }
     bool isRepeating()  const { return fieldKind == FieldKind.repeating; }
@@ -103,6 +111,13 @@ class EntryBuilder(T) {
     // For Nullable!T, calling .defaultValue() is a compile error ("no such member").
     static if (!isNullable!T) {
         EntryBuilder!T defaultValue(T val) {
+            static if (isRepeatingField!T) {
+                import darkcommand.exceptions : DarkCommandException;
+                if (_spec.oneOrMore)
+                    throw new DarkCommandException(
+                        "defaultValue() conflicts with required() — a required " ~
+                        "(one-or-more) field cannot also have a default");
+            }
             auto ptr = _ptr;
             _spec.writeDefault = () { *ptr = val; };
             _spec.hasDefault   = true;
@@ -120,6 +135,19 @@ class EntryBuilder(T) {
         import std.range : ElementType;
         EntryBuilder!T validateEachWith(bool delegate(ElementType!T) pred, string msg) {
             _spec.validators ~= new DelegateValidator!(ElementType!T)(pred, msg);
+            return this;
+        }
+
+        // Mark a repeating field (option or argument) as one-or-more: at least
+        // one value must be supplied, otherwise the parser reports it missing.
+        // Without this, a repeating field is zero-or-more (empty if absent).
+        EntryBuilder!T required() {
+            import darkcommand.exceptions : DarkCommandException;
+            if (_spec.hasDefault)
+                throw new DarkCommandException(
+                    "required() conflicts with defaultValue() — a required " ~
+                    "(one-or-more) field cannot also have a default");
+            _spec.oneOrMore = true;
             return this;
         }
     } else static if (isNullable!T) {

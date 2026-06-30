@@ -68,7 +68,8 @@ Building src with 8 jobs (release=true)
 | `T` + `.defaultValue(x)` | `addOption` / `addArgument` | optional with default |
 | `Nullable!T` | `addOption` / `addArgument` | optional; `.isNull` if not provided |
 | `T[]` (Option) | `addOption` | zero or more; accumulated |
-| `T[]` (Argument) | `addArgument` | one or more; error if absent |
+| `T[]` (Argument) | `addArgument` | zero or more; empty if absent |
+| `T[]` + `.required()` | `addOption` / `addArgument` | one or more; error if absent |
 
 `T` can be any type that `std.conv.to!T` can construct from a `string` — including custom structs with a `this(string)` constructor. For example, `thepath.Path` works directly as a field type with no extra registration:
 
@@ -104,6 +105,9 @@ this.addArgument!(source)("source", "File or directory")
 
 this.addOption!(count)("n", "count", "Count")
     .validateEachWith(v => v > 0, "must be positive");
+
+this.addArgument!(files)("files", "Input files")
+    .required();                               // one or more (default is zero or more)
 ```
 
 ## Subcommands and parent access

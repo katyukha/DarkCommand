@@ -272,7 +272,9 @@ private Command _parseOne(Command cmd, ref string[] argv) {
 private void _finalize(Command cmd, EntrySpec[] argSpecs, size_t argIdx) {
     foreach (e; cmd._entries) {
         if (!e.provided) {
-            if (e.isRequired()) {
+            // Repeating arguments marked .required() are also required, but the
+            // dedicated loop below gives them a clearer "one or more" message.
+            if (e.isRequired() && !(e.isArgument() && e.isRepeating())) {
                 string kind = e.kind == EntrySpec.Kind.argument ? "argument" : "option";
                 throw new DarkCommandException(
                     "missing required " ~ kind ~ ": " ~ e.cliName);
@@ -281,11 +283,10 @@ private void _finalize(Command cmd, EntrySpec[] argSpecs, size_t argIdx) {
                 e.writeDefault();
         }
     }
-    // Check that T[] Arguments received at least one value.
-    // If hasDefault is true the argument was registered with .defaultValue([]),
-    // making it zero-or-more optional; skip the "at least one" enforcement.
+    // Repeating T[] Arguments are zero-or-more by default; .required() makes them
+    // one-or-more. Enforce "at least one value" only when marked required.
     foreach (aspec; argSpecs) {
-        if (aspec.isRepeating() && !aspec.provided && !aspec.hasDefault)
+        if (aspec.isRepeating() && aspec.isRequired() && !aspec.provided)
             throw new DarkCommandException(
                 "missing required argument: " ~ aspec.displayName ~
                 " (expected one or more values)");
