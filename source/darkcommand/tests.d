@@ -388,6 +388,34 @@ class GenDocsApp : Program {
     override protected void setup() {}
 }
 
+// Full-coverage fixture for JSON docs: flag, option with acceptsValues,
+// subcommand with a required scalar arg + a repeating (zero-or-more) arg,
+// and a shortcut.
+class JsonDocsSubCmd : Command {
+    string   name;
+    string[] files;
+    this() {
+        super("run", "Run the thing");
+        this.addArgument!(name)("name", "The name");
+        this.addArgument!(files)("files", "Input files");
+    }
+}
+
+class JsonDocsApp : Program {
+    bool   verbose;
+    string format;
+    this() {
+        super("myprog", "2.1.0");
+        summary("Does things.");
+        this.addFlag!(verbose)("v", "verbose", "Verbose output");
+        this.addOption!(format)("f", "format", "Output format")
+            .acceptsValues(["json", "csv"]);
+        add(new JsonDocsSubCmd());
+        addShortcut("r", ["run"], "Shortcut for run");
+    }
+    override protected void setup() {}
+}
+
 class DynCompleteApp : Program {
     string database;
     string host;
@@ -2010,4 +2038,94 @@ unittest { // bash completion: completesWithCommand emits dynamic subshell for -
     // --host has no special completion; it must NOT appear in the prev-case block
     assert(content.indexOf("--host") < 0 || content.indexOf("-H|--host") < 0,
            "--host must not have a prev-case entry");
+}
+
+// ── JSON docs ─────────────────────────────────────────────────────────────────
+
+unittest { // JSON docs: full structure round-trips and maps fields correctly
+    import darkcommand.docs.json : commandTreeToJSON;
+    import std.json : parseJSON;
+
+    auto j = commandTreeToJSON(new JsonDocsApp());
+    auto p = parseJSON(j.toString);   // round-trip through a string to prove validity
+
+    // Top level.
+    assert(p["schema_version"].integer == 1);
+    assert(p["program"].str == "myprog");
+    assert(p["version"].str == "2.1.0");
+
+    auto cmd = p["command"];
+    assert(cmd["name"].str == "myprog");
+    assert(cmd["summary"].str == "Does things.");
+
+    // Options: the declared flag + option only — no synthesized --help/--version.
+    auto opts = cmd["options"].array;
+    assert(opts.length == 2);
+    bool sawFlag, sawOption;
+    foreach (o; opts) {
+        assert(o["name"].str != "--help" && o["name"].str != "--version");
+        if (o["kind"].str == "flag") {
+            sawFlag = true;
+            assert(o["short"].str == "v" && o["long"].str == "verbose");
+            assert(o["repeating"].boolean == false);
+        } else if (o["kind"].str == "option") {
+            sawOption = true;
+            assert(o["name"].str == "--format");
+            auto av = o["accepts_values"].array;
+            assert(av.length == 2 && av[0].str == "json" && av[1].str == "csv");
+        }
+    }
+    assert(sawFlag && sawOption);
+
+    // Subcommand with arguments.
+    auto subs = cmd["subcommands"].array;
+    assert(subs.length == 1);
+    auto run = subs[0];
+    assert(run["name"].str == "run");
+
+    auto args = run["arguments"].array;
+    assert(args.length == 2);
+    // Scalar positional: required, not repeating.
+    assert(args[0]["name"].str == "name");
+    assert(args[0]["required"].boolean == true);
+    assert(args[0]["repeating"].boolean == false);
+    // Repeating positional with no .required(): zero-or-more → not required.
+    assert(args[1]["name"].str == "files");
+    assert(args[1]["required"].boolean == false);
+    assert(args[1]["repeating"].boolean == true);
+
+    // Shortcuts: root only.
+    auto sc = cmd["shortcuts"].array;
+    assert(sc.length == 1);
+    assert(sc[0]["name"].str == "r");
+    assert(sc[0]["expansion"].array[0].str == "run");
+    assert(("shortcuts" in run) is null, "subcommands must not carry a shortcuts key");
+}
+
+unittest { // JSON docs: a required repeating argument reports required:true
+    import darkcommand.docs.json : commandTreeToJSON;
+    import std.json : parseJSON;
+
+    auto p = parseJSON(commandTreeToJSON(new RepArgRequiredApp()).toString);
+    auto args = p["command"]["arguments"].array;
+    assert(args.length == 1);
+    assert(args[0]["name"].str == "files");
+    assert(args[0]["required"].boolean == true);
+    assert(args[0]["repeating"].boolean == true);
+}
+
+unittest { // generateJSONDocs writes valid, parseable pretty JSON to a File
+    import darkcommand.docs.json : generateJSONDocs;
+    import std.json : parseJSON;
+    import std.stdio : File;
+
+    auto tmp = File.tmpfile();
+    new JsonDocsApp().generateJSONDocs(tmp);
+    tmp.flush(); tmp.seek(0);
+
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+
+    auto p = parseJSON(content);
+    assert(p["program"].str == "myprog");
 }

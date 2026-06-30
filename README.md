@@ -212,14 +212,22 @@ override int execute() {
 }
 ```
 
-## Bash completion and Markdown docs
+## Bash completion, Markdown, and JSON docs
 
 ```d
 // In a separate dub configuration entry point:
 import std.stdio : stdout;
 new MyApp().generateBashCompletion(stdout);   // source the output in ~/.bashrc
 new MyApp().generateMarkdownDocs(stdout);     // pipe to docs/reference.md
+
+import darkcommand.docs.json : generateJSONDocs, commandTreeToJSON;
+new MyApp().generateJSONDocs(stdout);         // machine-readable command tree
+auto tree = commandTreeToJSON(new MyApp());   // or get the JSONValue to embed
 ```
+
+The JSON export is a drift-free dump of the live command tree (commands,
+options, flags, arguments, shortcuts) for agent tooling, scripts, and IDEs. It
+emits only declared entries — the universal `--help`/`--version` are omitted.
 
 ## Testing commands in isolation
 
