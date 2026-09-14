@@ -228,6 +228,27 @@ class ParentChildApp : Program {
     override protected void setup() {}
 }
 
+class AncestorApp : Program {
+    string config;
+    this() {
+        super("app", "1.0.0");
+        this.addOption!(config)("c", "config", "Config").defaultValue("def");
+        add(new AncestorMidCmd());
+    }
+    override protected void setup() {}
+}
+class AncestorMidCmd : Command {
+    this() {
+        super("mid", "Middle level");
+        add(new AncestorLeafCmd());
+    }
+}
+class AncestorLeafCmd : Command {
+    this() { super("leaf", "Leaf level"); }
+    // Depth-generic: reaches the root without spelling the parent chain.
+    string rootConfig() { return ancestor!AncestorApp.config; }
+}
+
 // Hooks are on a Command subclass; Program uses setup(), not afterParse/validate.
 class HooksCmd : Command {
     string method;
@@ -704,6 +725,39 @@ unittest { // parent!T()
     auto app  = new ParentChildApp();
     auto child = .parseOnly!ChildCmd(app, ["app", "parent", "child"]);
     assert(child.getParentName() == "parent");
+}
+
+unittest { // ancestor!T(): nearest matching ancestor, any depth
+    auto leaf = .parseOnly!AncestorLeafCmd(
+        new AncestorApp(), ["app", "mid", "leaf"]);
+    assert(leaf.ancestor!AncestorMidCmd !is null);      // direct parent
+    assert(leaf.ancestor!AncestorApp.config == "def");  // skips a level
+    assert(leaf.rootConfig() == "def");                 // from inside the command
+}
+
+unittest { // ancestor!T(): base-class T resolves to the nearest match
+    auto leaf = .parseOnly!AncestorLeafCmd(
+        new AncestorApp(), ["app", "mid", "leaf"]);
+    assert(leaf.ancestor!Command is leaf.parent!AncestorMidCmd);
+    assert(leaf.ancestor!Program is leaf.ancestor!AncestorApp);
+}
+
+unittest { // ancestorOrNull!T(): same lookup, null instead of throwing
+    auto app  = new AncestorApp();
+    auto leaf = .parseOnly!AncestorLeafCmd(app, ["app", "mid", "leaf"]);
+    assert(leaf.ancestorOrNull!AncestorApp is leaf.ancestor!AncestorApp);
+    assert(leaf.ancestorOrNull!HooksCmd is null);   // unrelated type
+    assert(app.ancestorOrNull!Program is null);     // root has no ancestors
+    if (auto a = leaf.ancestorOrNull!AncestorApp)   // idiomatic guarded use
+        assert(a.config == "def");
+}
+
+unittest { // ancestor!T(): throws when nothing in the chain matches
+    import std.exception : assertThrown;
+    auto app  = new AncestorApp();
+    auto leaf = .parseOnly!AncestorLeafCmd(app, ["app", "mid", "leaf"]);
+    assertThrown!DarkCommandException(leaf.ancestor!HooksCmd);
+    assertThrown!DarkCommandException(app.ancestor!Program); // root has no ancestors
 }
 
 unittest { // afterParse and validate hooks called on subcommand; validate can abort

@@ -136,6 +136,27 @@ class CreateCmd : Command {
 }
 ```
 
+`ancestor!T()` finds the nearest ancestor of type `T` at any depth — useful from
+deeply nested commands or shared base classes, where the exact parent chain is
+unknown or varies:
+
+```d
+override int execute() {
+    auto app = ancestor!MyApp;   // reaches the Program from any nesting level
+    // ...
+    return 0;
+}
+```
+
+Both throw `DarkCommandException` (never a null dereference) when no match exists.
+`ancestorOrNull!T()` is the non-throwing form — it returns `null` when nothing
+in the chain matches:
+
+```d
+if (auto app = ancestorOrNull!MyApp)
+    useConfig(app.config);
+```
+
 ## Lifecycle hooks
 
 ```d

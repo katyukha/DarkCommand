@@ -141,6 +141,28 @@ class Command {
         return p;
     }
 
+    // ── ancestor!T() ──────────────────────────────────────────────────────────
+
+    // Nearest strict ancestor that casts to T. Depth-generic, so shared base
+    // classes can reach the Program (or an intermediate command) without
+    // spelling out the parent chain for each nesting level.
+    T ancestor(T)() {
+        if (auto a = ancestorOrNull!T)
+            return a;
+        throw new DarkCommandException(
+            "no ancestor of type " ~ T.stringof ~
+            " above command '" ~ _name ~ "'");
+    }
+
+    // Non-throwing form: null when nothing in the chain matches. T is a class,
+    // so the reference itself carries the "not found" state — no Nullable.
+    T ancestorOrNull(T)() {
+        for (Command c = _parent; c !is null; c = c._parent)
+            if (auto a = cast(T) c)
+                return a;
+        return null;
+    }
+
     // ── exitWith ──────────────────────────────────────────────────────────────
 
     final void exitWith(int code, string msg = null) {
