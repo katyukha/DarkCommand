@@ -29,11 +29,11 @@ private void _writeSection(File f, Command cmd, int depth, string breadcrumb) {
     f.writeln();
 
     if (cmd.summary.length) {
-        f.writeln(cmd.summary);
+        f.writeln(_escapeMdText(cmd.summary));
         f.writeln();
     }
     if (cmd.description.length) {
-        f.writeln(cmd.description);
+        f.writeln(_escapeMdText(cmd.description));
         f.writeln();
     }
 
@@ -103,7 +103,7 @@ private void _writeSection(File f, Command cmd, int depth, string breadcrumb) {
         f.writeln();
         foreach (sub; cmd._subcommands)
             f.writefln("- [`%s`](#%s) — %s",
-                       sub.name, _anchor(fullName ~ " " ~ sub.name), sub.summary);
+                       sub.name, _anchor(fullName ~ " " ~ sub.name), _escapeMdText(sub.summary));
         f.writeln();
 
         // Recurse into each subcommand
@@ -138,8 +138,26 @@ private string _anchor(string s) {
     return r.idup;
 }
 
-// Escape characters that break a Markdown table cell.
+// Escape characters that break a Markdown table cell. With backticks escaped
+// there are no code spans, so every `<placeholder>` is escaped too.
 private string _escapeMdCell(string s) {
     import std.array : replace;
-    return s.replace("\n", " ").replace("|", "\\|").replace("`", "\\`");
+    return _escapeAngles(
+        s.replace("\n", " ").replace("|", "\\|").replace("`", "\\`"));
+}
+
+// Escape `<placeholder>`s in help text, which Markdown would read as HTML
+// tags; code spans (between backticks) are kept as written.
+private string _escapeMdText(string s) {
+    import std.array : join, split;
+    auto parts = s.split("`");
+    foreach (i, ref part; parts)
+        if (i % 2 == 0)
+            part = _escapeAngles(part);
+    return parts.join("`");
+}
+
+private string _escapeAngles(string s) {
+    import std.array : replace;
+    return s.replace("<", "&lt;").replace(">", "&gt;");
 }

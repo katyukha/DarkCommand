@@ -1252,6 +1252,21 @@ class PipeDescApp : Program {
     override protected void setup() {}
 }
 
+class AngleSubCmd : Command {
+    this() { super("show", "Show the <name> release"); }
+}
+class AngleDescApp : Program {
+    string cred;
+    this() {
+        super("app", "1.0.0");
+        summary("Read ENV_<group> first.");
+        description("Pass `--cred <group>` to name it.");
+        this.addOption!(cred)("", "cred", "Credentials from ENV_<group>_CRED");
+        add(new AngleSubCmd());
+    }
+    override protected void setup() {}
+}
+
 class UnderscoreSubCmd : Command {
     this() { super("my_command", "Sub"); }
 }
@@ -1315,6 +1330,26 @@ unittest { // markdown docs: pipe in description is escaped as \|
     string content; char[] line;
     while (tmp.readln(line)) content ~= line;
     assert(content.indexOf("one \\| two \\| three") >= 0, content);
+}
+
+// ── Markdown angle brackets ───────────────────────────────────────────────────
+
+unittest { // markdown docs: <placeholder> in help text is escaped, not read as HTML
+    import darkcommand.docs.markdown : generateMarkdownDocs;
+    import std.stdio : File;
+    import std.string : indexOf;
+    auto tmp = File.tmpfile();
+    new AngleDescApp().generateMarkdownDocs(tmp);
+    tmp.flush(); tmp.seek(0);
+    string content; char[] line;
+    while (tmp.readln(line)) content ~= line;
+    // Option table cell, summary paragraph and subcommand index.
+    assert(content.indexOf("ENV_&lt;group&gt;_CRED") >= 0, content);
+    assert(content.indexOf("Read ENV_&lt;group&gt; first.") >= 0, content);
+    assert(content.indexOf(
+        "- [`show`](#app-show) — Show the &lt;name&gt; release") >= 0, content);
+    // A code span is kept as written.
+    assert(content.indexOf("Pass `--cred <group>` to name it.") >= 0, content);
 }
 
 // ── Markdown anchor underscores ───────────────────────────────────────────────
